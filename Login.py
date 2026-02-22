@@ -53,7 +53,8 @@ if st.button("Entrar"):
         st.success("Login realizado com sucesso! Redirecionando...")
 
         # 🚀 Redireciona para dfc_it.py dentro da pasta pages
-        st.switch_page("pages/Sistema de Fluxo de Caixa Interativo.py")
+        st.switch_page("Sistema de Fluxo de Caixa Interativo")
     else:
         st.error("Usuário ou senha inválidos!")
+
 
