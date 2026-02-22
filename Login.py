@@ -35,6 +35,20 @@ def validar_login(login, senha):
             return True, permissao
     return False, None
 
+def cadastrar_usuario(login, senha):
+    conn = sqlite3.connect("data/dfc.db")
+    cur = conn.cursor()
+    try:
+        senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+        cur.execute("INSERT INTO usuarios (login, senha, permissao) VALUES (?, ?, ?)",
+                    (login.upper(), senha_hash, "visitante"))
+        conn.commit()
+        st.success("Usuário cadastrado com sucesso! ✅")
+    except sqlite3.IntegrityError:
+        st.error("Esse login já existe!")
+    finally:
+        conn.close()
+
 # Configuração da página de login
 st.set_page_config(page_title="Login DFC", layout="centered")
 st.title("🔑 Login no Sistema DFC")
@@ -54,6 +68,15 @@ if st.button("Entrar"):
     else:
         st.error("Usuário ou senha inválidos!")
 
+# 🔹 Formulário para cadastrar novos usuários
+st.markdown("---")
+st.subheader("📋 Cadastro de Novo Usuário")
 
+novo_login = st.text_input("Novo Usuário").upper()
+nova_senha = st.text_input("Nova Senha", type="password")
 
-
+if st.button("Cadastrar"):
+    if novo_login and nova_senha:
+        cadastrar_usuario(novo_login, nova_senha)
+    else:
+        st.warning("Preencha usuário e senha para cadastrar!")
