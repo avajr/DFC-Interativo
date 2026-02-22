@@ -51,11 +51,9 @@ if st.button("Entrar"):
         st.session_state["permissao"] = permissao
         st.session_state["logado"] = True
         st.success("Login realizado com sucesso! Redirecionando...")
-
-        # 🚀 Redireciona para dfc_it.py dentro da pasta pages
-        st.switch_page("sistema")
     else:
         st.error("Usuário ou senha inválidos!")
+
 
 
 
