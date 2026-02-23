@@ -175,14 +175,15 @@ if permissao in ["visualizador", "visitante"]:
                                             valor=df_reg["valor"].apply(formatar_valor)
                                         ),
                                         use_container_width=True
-                                    )
-                                    st.download_button(
-                                        label="📥 Baixar em Excel",
-                                        data=to_excel(df_reg),
-                                        file_name=f"lancamentos_{registro}.xlsx",
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                    )
-            
+    
+            # 📥 Botão geral para todos os lançamentos filtrados
+            st.download_button(
+                label="📥 Baixar todos os lançamentos filtrados",
+                data=to_excel(df_filtrado),
+                file_name="lancamentos_filtrados.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+  
             total_geral = df_filtrado["valor"].sum()
             st.markdown(f"### 💰 Total Geral: {formatar_valor(total_geral)}")
 
