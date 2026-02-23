@@ -75,7 +75,7 @@ if acao == "Login":
             st.success("Login realizado com sucesso! Redirecionando...")
 
             # 🚀 Redireciona para a página do sistema
-            st.switch_page("sistema")
+
         else:
             st.error("Usuário ou senha inválidos!")
 
@@ -88,3 +88,4 @@ elif acao == "Cadastrar novo usuário":
             cadastrar_usuario(novo_login, nova_senha)
         else:
             st.warning("Preencha usuário e senha para cadastrar!")
+
