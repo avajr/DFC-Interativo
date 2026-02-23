@@ -18,8 +18,10 @@ def criar_tabela_usuarios():
     cur.execute("SELECT * FROM usuarios WHERE login = ?", ("AVANDO",))
     if not cur.fetchone():
         senha_hash = hashlib.sha256("Ubewd.4500".encode()).hexdigest()
-        cur.execute("INSERT INTO usuarios (login, senha, permissao) VALUES (?, ?, ?)",
-                    ("AVANDO", senha_hash, "super_admin"))
+        cur.execute(
+            "INSERT INTO usuarios (login, senha, permissao) VALUES (?, ?, ?)",
+            ("AVANDO", senha_hash, "super_admin")
+        )
         conn.commit()
     conn.close()
 
@@ -40,8 +42,10 @@ def cadastrar_usuario(login, senha):
     cur = conn.cursor()
     try:
         senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-        cur.execute("INSERT INTO usuarios (login, senha, permissao) VALUES (?, ?, ?)",
-                    (login.upper(), senha_hash, "visitante"))
+        cur.execute(
+            "INSERT INTO usuarios (login, senha, permissao) VALUES (?, ?, ?)",
+            (login.upper(), senha_hash, "visitante")
+        )
         conn.commit()
         st.success("Usuário cadastrado com sucesso! ✅")
     except sqlite3.IntegrityError:
@@ -55,24 +59,27 @@ st.title("🔑 Login no Sistema DFC")
 
 criar_tabela_usuarios()
 
-login = st.text_input("Usuário").upper()
-senha = st.text_input("Senha", type="password")
+# Selectbox para escolher ação
+acao = st.selectbox("Selecione uma opção:", ["Login", "Cadastrar novo usuário"])
 
-if st.button("Entrar"):
-    valido, permissao = validar_login(login, senha)
-    if valido:
-        st.session_state["usuario"] = login
-        st.session_state["permissao"] = permissao
-        st.session_state["logado"] = True
-        st.success("Login realizado com sucesso! Redirecionando...")
-        
-        # 🚀 Redireciona para dfc_it.py dentro da pasta pages
-        st.switch_page("pages/Sistema de Fluxo de Caixa Interativo.py")
-    else:
-        st.error("Usuário ou senha inválidos!")
+if acao == "Login":
+    login = st.text_input("Usuário").upper()
+    senha = st.text_input("Senha", type="password")
 
-# 🔹 Formulário para cadastrar novos usuários
-if acao == "Cadastrar novo usuário":
+    if st.button("Entrar"):
+        valido, permissao = validar_login(login, senha)
+        if valido:
+            st.session_state["usuario"] = login
+            st.session_state["permissao"] = permissao
+            st.session_state["logado"] = True
+            st.success("Login realizado com sucesso! Redirecionando...")
+
+            # 🚀 Redireciona para a página do sistema
+            st.switch_page("sistema")
+        else:
+            st.error("Usuário ou senha inválidos!")
+
+elif acao == "Cadastrar novo usuário":
     novo_login = st.text_input("Novo Usuário").upper()
     nova_senha = st.text_input("Nova Senha", type="password")
 
@@ -81,6 +88,3 @@ if acao == "Cadastrar novo usuário":
             cadastrar_usuario(novo_login, nova_senha)
         else:
             st.warning("Preencha usuário e senha para cadastrar!")
-
-
-
