@@ -12,13 +12,6 @@ def get_connection():
     )
     return conn
 
-try:
-    conn = get_connection()
-    conn.close()
-    st.success("✅ Conexão com Supabase funcionando!")
-except Exception as e:
-    st.error(f"Erro de conexão: {e}")
-
 def criar_tabela_usuarios():
     conn = get_connection()
     cur = conn.cursor()
@@ -104,6 +97,7 @@ elif acao == "Cadastrar novo usuário":
             cadastrar_usuario(novo_login, nova_senha)
         else:
             st.warning("Preencha usuário e senha para cadastrar!")
+
 
 
 
