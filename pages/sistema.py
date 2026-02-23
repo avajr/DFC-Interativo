@@ -634,6 +634,14 @@ else:
                                         use_container_width=True
                                     )
 
+            # 📥 Botão geral para todos os lançamentos filtrados
+            st.download_button(
+                label="📥 Baixar todos os lançamentos filtrados",
+                data=to_excel(df_filtrado),
+                file_name="lancamentos_filtrados.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            
             total_geral = df_filtrado["valor"].sum()
             st.markdown(f"### 💰 Total Geral: {formatar_valor(total_geral)}")
 
