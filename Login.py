@@ -1,12 +1,23 @@
+import psycopg2
 import streamlit as st
-import hashlib, sqlite3
+import hashlib
+
+def get_connection():
+    conn = psycopg2.connect(
+        host=st.secrets["PGHOST"],
+        port=st.secrets["PGPORT"],
+        dbname=st.secrets["PGDATABASE"],
+        user=st.secrets["PGUSER"],
+        password=st.secrets["PGPASSWORD"]
+    )
+    return conn
 
 def criar_tabela_usuarios():
-    conn = sqlite3.connect("data/dfc.db")
+    conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             login TEXT UNIQUE,
             senha TEXT,
             permissao TEXT
@@ -15,20 +26,20 @@ def criar_tabela_usuarios():
     conn.commit()
 
     # Criar super admin se não existir
-    cur.execute("SELECT * FROM usuarios WHERE login = ?", ("AVANDO",))
+    cur.execute("SELECT * FROM usuarios WHERE login = %s", ("AVANDO",))
     if not cur.fetchone():
         senha_hash = hashlib.sha256("Ubewd.4500".encode()).hexdigest()
         cur.execute(
-            "INSERT INTO usuarios (login, senha, permissao) VALUES (?, ?, ?)",
+            "INSERT INTO usuarios (login, senha, permissao) VALUES (%s, %s, %s)",
             ("AVANDO", senha_hash, "super_admin")
         )
         conn.commit()
     conn.close()
 
 def validar_login(login, senha):
-    conn = sqlite3.connect("data/dfc.db")
+    conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT senha, permissao FROM usuarios WHERE login = ?", (login.upper(),))
+    cur.execute("SELECT senha, permissao FROM usuarios WHERE login = %s", (login.upper(),))
     row = cur.fetchone()
     conn.close()
     if row:
@@ -38,18 +49,18 @@ def validar_login(login, senha):
     return False, None
 
 def cadastrar_usuario(login, senha):
-    conn = sqlite3.connect("data/dfc.db")
+    conn = get_connection()
     cur = conn.cursor()
     try:
         senha_hash = hashlib.sha256(senha.encode()).hexdigest()
         cur.execute(
-            "INSERT INTO usuarios (login, senha, permissao) VALUES (?, ?, ?)",
+            "INSERT INTO usuarios (login, senha, permissao) VALUES (%s, %s, %s)",
             (login.upper(), senha_hash, "visitante")
         )
         conn.commit()
         st.success("Usuário cadastrado com sucesso! ✅")
-    except sqlite3.IntegrityError:
-        st.error("Esse login já existe!")
+    except psycopg2.Error:
+        st.error("Esse login já existe ou houve erro!")
     finally:
         conn.close()
 
@@ -73,9 +84,7 @@ if acao == "Login":
             st.session_state["permissao"] = permissao
             st.session_state["logado"] = True
             st.success("Login realizado com sucesso! Redirecionando...")
-
-            # 🚀 Redireciona para a página do sistema
-
+            # 🚀 Aqui você pode usar st.switch_page("sistema")
         else:
             st.error("Usuário ou senha inválidos!")
 
@@ -88,4 +97,6 @@ elif acao == "Cadastrar novo usuário":
             cadastrar_usuario(novo_login, nova_senha)
         else:
             st.warning("Preencha usuário e senha para cadastrar!")
+
+
 
