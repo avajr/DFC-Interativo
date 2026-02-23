@@ -151,22 +151,34 @@ if permissao in ["visualizador", "visitante"]:
 
             for mestre in mestres_ordenados:
                 df_mestre = df_filtrado[df_filtrado["mestre"] == mestre]
-                nome_mestre = df_mestre["nome_mestre"].iloc[0]
-                soma_mestre = df_mestre["valor"].sum()
+                if not df_mestre.empty:
+                    nome_mestre = df_mestre["nome_mestre"].iloc[0]
+                    soma_mestre = df_mestre["valor"].sum()
+                else:
+                    nome_mestre = "(sem nome)"
+                    soma_mestre = 0
 
                 with st.expander(f"{mestre} - {nome_mestre} | Total: {formatar_valor(soma_mestre)}"):
                     subchaves_ordenadas = sorted(df_mestre["subchave"].unique(), key=lambda x: float(x))
                     for subchave in subchaves_ordenadas:
                         df_sub = df_mestre[df_mestre["subchave"] == subchave]
-                        nome_sub = df_sub["nome_subchave"].iloc[0]
-                        soma_sub = df_sub["valor"].sum()
+                        if not df_sub.empty:
+                            nome_sub = df_sub["nome_subchave"].iloc[0]
+                            soma_sub = df_sub["valor"].sum()
+                        else:
+                            nome_sub = "(sem nome)"
+                            soma_sub = 0
 
                         with st.expander(f"{subchave} - {nome_sub} | Total: {formatar_valor(soma_sub)}"):
                             registros_ordenados = sorted(df_sub["registro"].unique(), key=lambda x: float(x.replace(".", "")))
                             for registro in registros_ordenados:
                                 df_reg = df_sub[df_sub["registro"] == registro]
-                                nome_reg = df_reg["nome_registro"].iloc[0]
-                                soma_reg = df_reg["valor"].sum()
+                                if not df_reg.empty:
+                                    nome_reg = df_reg["nome_registro"].iloc[0]
+                                    soma_reg = df_reg["valor"].sum()
+                                else:
+                                    nome_reg = "(sem nome)"
+                                    soma_reg = 0
 
                                 with st.expander(f"{registro} - {nome_reg} | Total: {formatar_valor(soma_reg)}"):
                                     st.dataframe(
@@ -608,22 +620,34 @@ else:
 
             for mestre in mestres_ordenados:
                 df_mestre = df_filtrado[df_filtrado["mestre"] == mestre]
-                nome_mestre = df_mestre["nome_mestre"].iloc[0]
-                soma_mestre = df_mestre["valor"].sum()
+                if not df_mestre.empty:
+                    nome_mestre = df_mestre["nome_mestre"].iloc[0]
+                    soma_mestre = df_mestre["valor"].sum()
+                else:
+                    nome_mestre = "(sem nome)"
+                    soma_mestre = 0
 
                 with st.expander(f"{mestre} - {nome_mestre} | Total: {formatar_valor(soma_mestre)}"):
                     subchaves_ordenadas = sorted(df_mestre["subchave"].unique(), key=lambda x: float(x))
                     for subchave in subchaves_ordenadas:
                         df_sub = df_mestre[df_mestre["subchave"] == subchave]
-                        nome_sub = df_sub["nome_subchave"].iloc[0]
-                        soma_sub = df_sub["valor"].sum()
+                        if not df_sub.empty:
+                            nome_sub = df_sub["nome_subchave"].iloc[0]
+                            soma_sub = df_sub["valor"].sum()
+                        else:
+                            nome_sub = "(sem nome)"
+                            soma_sub = 0
 
                         with st.expander(f"{subchave} - {nome_sub} | Total: {formatar_valor(soma_sub)}"):
                             registros_ordenados = sorted(df_sub["registro"].unique(), key=lambda x: float(x.replace(".", "")))
                             for registro in registros_ordenados:
                                 df_reg = df_sub[df_sub["registro"] == registro]
-                                nome_reg = df_reg["nome_registro"].iloc[0]
-                                soma_reg = df_reg["valor"].sum()
+                                if not df_reg.empty:
+                                    nome_reg = df_reg["nome_registro"].iloc[0]
+                                    soma_reg = df_reg["valor"].sum()
+                                else:
+                                    nome_reg = "(sem nome)"
+                                    soma_reg = 0
 
                                 with st.expander(f"{registro} - {nome_reg} | Total: {formatar_valor(soma_reg)}"):
                                     st.dataframe(
