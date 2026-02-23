@@ -175,6 +175,7 @@ if permissao in ["visualizador", "visitante"]:
                                             valor=df_reg["valor"].apply(formatar_valor)
                                         ),
                                         use_container_width=True
+                                    )
     
             # 📥 Botão geral para todos os lançamentos filtrados
             st.download_button(
