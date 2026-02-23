@@ -11,6 +11,8 @@
 import os
 import pandas as pd
 import streamlit as st
+from io import BytesIO
+import pandas as pd
 
 from modules.database import importar_contas_excel, criar_tabelas
 from modules.contas import (
@@ -35,6 +37,16 @@ if "logado" not in st.session_state or not st.session_state["logado"]:
 
 # Se chegou aqui, já está logado
 permissao = st.session_state.get("permissao", "visualizador")
+
+# ============================================================
+# 🔹 Função utilitária para exportar DataFrame em Excel
+# ============================================================
+def to_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Lançamentos")
+    processed_data = output.getvalue()
+    return processed_data
 
 # ============================================================
 # 🔹 CONFIGURAÇÃO INICIAL DO STREAMLIT
@@ -164,7 +176,13 @@ if permissao in ["visualizador", "visitante"]:
                                         ),
                                         use_container_width=True
                                     )
-
+                                    st.download_button(
+                                        label="📥 Baixar em Excel",
+                                        data=to_excel(df_reg),
+                                        file_name=f"lancamentos_{registro}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                    )
+            
             total_geral = df_filtrado["valor"].sum()
             st.markdown(f"### 💰 Total Geral: {formatar_valor(total_geral)}")
 
