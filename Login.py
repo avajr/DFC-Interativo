@@ -65,18 +65,22 @@ if st.button("Entrar"):
         st.session_state["permissao"] = permissao
         st.session_state["logado"] = True
         st.success("Login realizado com sucesso! Redirecionando...")
+        
+        # 🚀 Redireciona para dfc_it.py dentro da pasta pages
+        st.switch_page("pages/Sistema de Fluxo de Caixa Interativo.py")
     else:
         st.error("Usuário ou senha inválidos!")
 
 # 🔹 Formulário para cadastrar novos usuários
-st.markdown("---")
-st.subheader("📋 Cadastro de Novo Usuário")
+if acao == "Cadastrar novo usuário":
+    novo_login = st.text_input("Novo Usuário").upper()
+    nova_senha = st.text_input("Nova Senha", type="password")
 
-novo_login = st.text_input("Novo Usuário").upper()
-nova_senha = st.text_input("Nova Senha", type="password")
+    if st.button("Cadastrar"):
+        if novo_login and nova_senha:
+            cadastrar_usuario(novo_login, nova_senha)
+        else:
+            st.warning("Preencha usuário e senha para cadastrar!")
 
-if st.button("Cadastrar"):
-    if novo_login and nova_senha:
-        cadastrar_usuario(novo_login, nova_senha)
-    else:
-        st.warning("Preencha usuário e senha para cadastrar!")
+
+
