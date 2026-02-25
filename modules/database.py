@@ -1,6 +1,7 @@
 import psycopg2
 import streamlit as st
 import pandas as pd
+from modules.database import executar_query
 
 # Função de conexão com Supabase/Postgres
 def conectar():
@@ -108,3 +109,4 @@ def atualizar_lancamentos(id_lancamentos, registro):
     """, (registro, id_lancamentos))
     conn.commit()
     conn.close()
+
