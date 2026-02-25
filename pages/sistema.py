@@ -52,7 +52,7 @@ def to_excel(df):
 # 🔹 CONFIGURAÇÃO INICIAL DO STREAMLIT
 # ============================================================
 
-st.set_page_config(page_title="DFC Interativa", layout="wide")
+st.set_page_config(page_title="DFC Interativa", layout="centred")
 st.title("💰 Sistema de Fluxo de Caixa Interativo")
 
 # Criar tabelas no banco (se não existirem)
@@ -575,6 +575,26 @@ else:
         # 🎛️ Filtros (na sidebar)
         # ============================================================
         st.sidebar.markdown("### 🎛️ Filtros")
+
+        # Converter coluna para datetime, ignorando erros
+        df_lanc["data"] = pd.to_datetime(df_lanc["data"], errors="coerce")
+        
+        # Remover valores nulos
+        datas_validas = df_lanc["data"].dropna()
+        
+        # Definir valores padrão seguros
+        if len(datas_validas) > 0:
+            data_inicial_padrao = datas_validas.min().date()
+            data_final_padrao = datas_validas.max().date()
+        else:
+            # Se não houver nenhuma data válida, usar hoje
+            hoje = pd.Timestamp.today().date()
+            data_inicial_padrao = hoje
+            data_final_padrao = hoje
+        
+        # Usar no date_input
+        data_inicio = st.sidebar.date_input("Data inicial", value=data_inicial_padrao)
+        data_fim = st.sidebar.date_input("Data final", value=data_final_padrao)
 
         data_inicio = st.sidebar.date_input(
             "Data inicial",
