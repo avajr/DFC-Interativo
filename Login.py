@@ -3,7 +3,7 @@ import streamlit as st
 import hashlib
 
 
-st.set_page_config(page_title="Login Demonstração Fluxo de Caixa Interativo", layout="wide")
+st.set_page_config(page_title="Login Demonstração Fluxo de Caixa Interativo", layout="centered")
 st.title("🔐 Login DFC")
 
 st.set_page_config(
@@ -107,6 +107,7 @@ elif acao == "Cadastrar novo usuário":
             cadastrar_usuario(novo_login, nova_senha)
         else:
             st.warning("Preencha usuário e senha para cadastrar!")
+
 
 
 
