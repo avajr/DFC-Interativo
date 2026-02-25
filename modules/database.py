@@ -1,18 +1,19 @@
-import sqlite3
+import psycopg2
+import streamlit as st
 import pandas as pd
 
-def executar_query(query, params=()):
-    conn = sqlite3.connect("data/dfc.db", check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute(query, params)
-    resultado = cursor.fetchall()
-    conn.commit()
-    conn.close()
-    return resultado
-
+# Função de conexão com Supabase/Postgres
 def conectar():
-    return sqlite3.connect("data/dfc.db", check_same_thread=False)
+    conn = psycopg2.connect(
+        host=st.secrets["PGHOST"],
+        port=st.secrets["PGPORT"],
+        dbname=st.secrets["PGDATABASE"],
+        user=st.secrets["PGUSER"],
+        password=st.secrets["PGPASSWORD"]
+    )
+    return conn
 
+# Criar tabelas no banco Supabase
 def criar_tabelas():
     conn = conectar()
     cur = conn.cursor()
@@ -20,7 +21,7 @@ def criar_tabelas():
     # Tabela de lançamentos
     cur.execute("""
         CREATE TABLE IF NOT EXISTS lancamentos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             data TEXT,
             valor REAL,
             banco TEXT,
@@ -35,7 +36,7 @@ def criar_tabelas():
         )
     """)
 
-    # Índices únicos
+    # Índices únicos (já garantidos pelos UNIQUE, mas deixei explícito)
     cur.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_lanc_unico_fitid
         ON lancamentos (fitid, checknum, banco, arquivo_origem)
@@ -61,6 +62,7 @@ def criar_tabelas():
     conn.commit()
     conn.close()
 
+# Importar contas de um Excel para Supabase
 def importar_contas_excel(arquivo):
     conn = conectar()
     df = pd.read_excel(arquivo)
@@ -76,9 +78,13 @@ def importar_contas_excel(arquivo):
     cur = conn.cursor()
     for _, row in df.iterrows():
         cur.execute("""
-            INSERT OR REPLACE INTO contas (
-                mestre, nome_mestre, subchave, nome_subchave, registro, nome_registro
-            ) VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO contas (mestre, nome_mestre, subchave, nome_subchave, registro, nome_registro)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (mestre, subchave, registro)
+            DO UPDATE SET
+                nome_mestre = EXCLUDED.nome_mestre,
+                nome_subchave = EXCLUDED.nome_subchave,
+                nome_registro = EXCLUDED.nome_registro
         """, (
             str(row["mestre"]),
             str(row["nome_mestre"]),
@@ -90,14 +96,15 @@ def importar_contas_excel(arquivo):
 
     conn.commit()
     conn.close()
-# Função para atualizar o campo conta_registro na tabela de lançamentos
+
+# Atualizar lançamentos
 def atualizar_lancamentos(id_lancamentos, registro):
     conn = conectar()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE lancamentos
-        SET conta_registro = ?
-        WHERE id = ?
+        SET conta_registro = %s
+        WHERE id = %s
     """, (registro, id_lancamentos))
     conn.commit()
     conn.close()
