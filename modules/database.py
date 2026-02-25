@@ -1,30 +1,40 @@
 import psycopg2
 import streamlit as st
 import pandas as pd
-from modules.database import executar_query
 
 # Função de conexão com Supabase/Postgres
 def conectar():
-    conn = psycopg2.connect(
+    return psycopg2.connect(
         host=st.secrets["PGHOST"],
         port=st.secrets["PGPORT"],
         dbname=st.secrets["PGDATABASE"],
         user=st.secrets["PGUSER"],
         password=st.secrets["PGPASSWORD"]
     )
-    return conn
+
+# Função genérica para executar queries
+def executar_query(query, params=None, fetch=False):
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute(query, params or ())
+    result = None
+    if fetch:
+        result = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+    return result
 
 # Criar tabelas no banco Supabase
 def criar_tabelas():
     conn = conectar()
     cur = conn.cursor()
 
-    # Tabela de lançamentos
     cur.execute("""
         CREATE TABLE IF NOT EXISTS lancamentos (
             id SERIAL PRIMARY KEY,
-            data TEXT,
-            valor REAL,
+            data DATE,
+            valor NUMERIC(12,2),
             banco TEXT,
             historico TEXT,
             conta_registro TEXT,
@@ -37,17 +47,6 @@ def criar_tabelas():
         )
     """)
 
-    # Índices únicos (já garantidos pelos UNIQUE, mas deixei explícito)
-    cur.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_lanc_unico_fitid
-        ON lancamentos (fitid, checknum, banco, arquivo_origem)
-    """)
-    cur.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_lanc_unico_assinatura
-        ON lancamentos (assinatura, banco)
-    """)
-
-    # Tabela de contas contábeis
     cur.execute("""
         CREATE TABLE IF NOT EXISTS contas (
             mestre TEXT,
@@ -61,6 +60,7 @@ def criar_tabelas():
     """)
 
     conn.commit()
+    cur.close()
     conn.close()
 
 # Importar contas de um Excel para Supabase
@@ -96,6 +96,7 @@ def importar_contas_excel(arquivo):
         ))
 
     conn.commit()
+    cur.close()
     conn.close()
 
 # Atualizar lançamentos
@@ -108,5 +109,5 @@ def atualizar_lancamentos(id_lancamentos, registro):
         WHERE id = %s
     """, (registro, id_lancamentos))
     conn.commit()
+    cursor.close()
     conn.close()
-
