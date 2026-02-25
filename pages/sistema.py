@@ -52,7 +52,7 @@ def to_excel(df):
 # 🔹 CONFIGURAÇÃO INICIAL DO STREAMLIT
 # ============================================================
 
-st.set_page_config(page_title="DFC Interativa", layout="centred")
+st.set_page_config(page_title="DFC Interativa", layout="centered")
 st.title("💰 Sistema de Fluxo de Caixa Interativo")
 
 # Criar tabelas no banco (se não existirem)
