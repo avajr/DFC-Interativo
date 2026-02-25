@@ -11,7 +11,6 @@ import streamlit as st
 import pandas as pd
 from modules.database import conectar
 
-
 # ============================================================
 # 🔹 SALVAR LANÇAMENTOS NO BANCO (EVITANDO DUPLICIDADE)
 # ============================================================
@@ -29,7 +28,8 @@ def salvar_lancamentos(lancamentos):
                 INSERT INTO lancamentos (
                     data, valor, banco, historico, conta_registro
                 )
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
             """, (
                 str(pd.to_datetime(lanc["data"]).date()),
                 float(lanc["valor"]),
@@ -45,10 +45,10 @@ def salvar_lancamentos(lancamentos):
             ignorados += 1
 
     conn.commit()
+    cur.close()
     conn.close()
 
     return inseridos, ignorados
-
 
 # ============================================================
 # 🔹 CARREGAR LANÇAMENTOS
@@ -75,7 +75,6 @@ def carregar_lancamentos():
     conn.close()
     return df
 
-
 # ============================================================
 # 🔹 SALVAR CLASSIFICAÇÃO DE UM LANÇAMENTO
 # ============================================================
@@ -86,9 +85,10 @@ def classificar_lancamento(id_lancamento, conta_registro):
 
     cur.execute("""
         UPDATE lancamentos
-        SET conta_registro = ?
-        WHERE id = ?
+        SET conta_registro = %s
+        WHERE id = %s
     """, (conta_registro, id_lancamento))
 
     conn.commit()
+    cur.close()
     conn.close()
