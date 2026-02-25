@@ -2,6 +2,16 @@ import psycopg2
 import streamlit as st
 import hashlib
 
+
+st.set_page_config(page_title="Login Demonstração Fluxo de Caixa Interativo", layout="wide")
+st.title("🔐 Login DFC")
+
+st.set_page_config(
+    page_title="🔑 Login DFC Interativo",
+    page_icon="🔐",   # ícone
+    layout="wide"
+)
+
 def get_connection():
     conn = psycopg2.connect(
         host=st.secrets["PGHOST"],
@@ -97,6 +107,7 @@ elif acao == "Cadastrar novo usuário":
             cadastrar_usuario(novo_login, nova_senha)
         else:
             st.warning("Preencha usuário e senha para cadastrar!")
+
 
 
 
