@@ -13,12 +13,8 @@
 import pandas as pd
 from modules.database import conectar
 
-
 # ============================================================
 # 🔹 1. CARREGAMENTO DAS CONTAS
-# ------------------------------------------------------------
-# Função responsável por buscar todas as contas cadastradas
-# no banco de dados, já ordenadas pela hierarquia.
 # ============================================================
 
 def carregar_contas():
@@ -31,19 +27,8 @@ def carregar_contas():
     conn.close()
     return df
 
-
-
 # ============================================================
 # 🔹 2. INSERÇÃO DE NOVA CONTA
-# ------------------------------------------------------------
-# Insere uma nova conta contábil na estrutura hierárquica.
-# Parâmetros:
-#   mestre        → nível 1  (ex: "1")
-#   subchave      → nível 2  (ex: "1.0")
-#   registro      → nível 3  (ex: "1.0.1")
-#   nome_mestre   → nome do nível 1
-#   nome_subchave → nome do nível 2
-#   nome_registro → nome do nível 3
 # ============================================================
 
 def inserir_conta(mestre, subchave, registro,
@@ -57,21 +42,16 @@ def inserir_conta(mestre, subchave, registro,
             mestre, subchave, registro,
             nome_mestre, nome_subchave, nome_registro
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """, (mestre, subchave, registro,
           nome_mestre, nome_subchave, nome_registro))
 
     conn.commit()
+    cur.close()
     conn.close()
-
-
 
 # ============================================================
 # 🔹 3. EDIÇÃO DE CONTA EXISTENTE
-# ------------------------------------------------------------
-# Permite alterar os nomes de uma conta já cadastrada.
-# A estrutura (mestre, subchave, registro) NÃO deve ser alterada,
-# pois ela é a chave primária da tabela.
 # ============================================================
 
 def editar_conta(mestre, subchave, registro,
@@ -82,28 +62,21 @@ def editar_conta(mestre, subchave, registro,
 
     cur.execute("""
         UPDATE contas
-        SET nome_mestre = ?,
-            nome_subchave = ?,
-            nome_registro = ?
-        WHERE mestre = ?
-          AND subchave = ?
-          AND registro = ?
+        SET nome_mestre = %s,
+            nome_subchave = %s,
+            nome_registro = %s
+        WHERE mestre = %s
+          AND subchave = %s
+          AND registro = %s
     """, (nome_mestre, nome_subchave, nome_registro,
           mestre, subchave, registro))
 
     conn.commit()
+    cur.close()
     conn.close()
-
-
 
 # ============================================================
 # 🔹 4. EXCLUSÃO DE CONTA
-# ------------------------------------------------------------
-# Remove uma conta contábil da estrutura.
-# IMPORTANTE:
-#   - Antes de excluir, o sistema deve verificar se existem
-#     lançamentos OFX classificados nessa conta.
-#   - Essa verificação será feita no módulo de classificação.
 # ============================================================
 
 def excluir_conta(mestre, subchave, registro):
@@ -112,34 +85,19 @@ def excluir_conta(mestre, subchave, registro):
 
     cur.execute("""
         DELETE FROM contas
-        WHERE mestre = ?
-          AND subchave = ?
-          AND registro = ?
+        WHERE mestre = %s
+          AND subchave = %s
+          AND registro = %s
     """, (mestre, subchave, registro))
 
     conn.commit()
+    cur.close()
     conn.close()
 
-
-
 # ============================================================
-# 🔹 5. FUNÇÕES AUXILIARES (A SEREM IMPLEMENTADAS)
-# ------------------------------------------------------------
-# Aqui vamos adicionar futuramente:
-#
-#   ✔ validar_formato_mestre()
-#   ✔ validar_formato_subchave()
-#   ✔ validar_formato_registro()
-#   ✔ gerar_proximo_codigo()
-#   ✔ montar_hierarquia()
-#
-# Essas funções vão ajudar:
-#   - a criar códigos automaticamente
-#   - validar se o usuário digitou "1.0.1" corretamente
-#   - montar a árvore hierárquica para exibir no Streamlit
+# 🔹 5. FUNÇÕES AUXILIARES
 # ============================================================
 
-# Exemplo de placeholder:
 def validar_codigo(codigo):
     # TODO: implementar validação de formato
     return True
