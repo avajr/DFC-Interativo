@@ -590,7 +590,7 @@ else:
         # 🎛️ Filtros (na sidebar)
         # ============================================================
         st.sidebar.markdown("### 🎛️ Filtros")
-
+        
         # Converter coluna para datetime, ignorando erros
         df_lanc["data"] = pd.to_datetime(df_lanc["data"], errors="coerce")
         
@@ -602,30 +602,21 @@ else:
             data_inicial_padrao = datas_validas.min().date()
             data_final_padrao = datas_validas.max().date()
         else:
-            # Se não houver nenhuma data válida, usar hoje
             hoje = pd.Timestamp.today().date()
             data_inicial_padrao = hoje
             data_final_padrao = hoje
         
-        # Usar no date_input
+        # Usar no date_input (apenas uma vez)
         data_inicio = st.sidebar.date_input("Data inicial", value=data_inicial_padrao)
         data_fim = st.sidebar.date_input("Data final", value=data_final_padrao)
-
-        data_inicio = st.sidebar.date_input(
-            "Data inicial",
-            value=pd.to_datetime(df_lanc["data"]).min().date()
-        )
-        data_fim = st.sidebar.date_input(
-            "Data final",
-            value=pd.to_datetime(df_lanc["data"]).max().date()
-        )
-
+        
+        # Filtros de Mestre, Subchave e Registro
         mestres_opcoes = sorted(df_lanc["mestre"].dropna().unique(), key=lambda x: float(x))
         mestre_sel = st.sidebar.multiselect("Filtrar por Mestre", options=mestres_opcoes)
-
+        
         subchaves_opcoes = sorted(df_lanc["subchave"].dropna().unique(), key=lambda x: float(x))
         subchave_sel = st.sidebar.multiselect("Filtrar por Subchave", options=subchaves_opcoes)
-
+        
         registros_opcoes = sorted(df_lanc["registro"].dropna().unique(), key=lambda x: float(x.replace(".", "")))
         registro_sel = st.sidebar.multiselect("Filtrar por Registro", options=registros_opcoes)
 
