@@ -14,32 +14,22 @@ from modules.database import conectar
 # ============================================================
 # 🔹 SALVAR LANÇAMENTOS NO BANCO (EVITANDO DUPLICIDADE)
 # ============================================================
-def salvar_lancamentos(lancamentos):
-    conn = conectar()
-    cur = conn.cursor()
-
-    inseridos = 0
-    ignorados = 0
-
-    for lanc in lancamentos:
-        try:
-            cur.execute("""
-                INSERT INTO lancamentos (
-                    data, valor, historico, banco, arquivo_origem, fitid, checknum, assinatura, conta_registro
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (fitid, banco, arquivo_origem) DO NOTHING
-            """, (
-                str(pd.to_datetime(lanc["data"]).date()),
-                float(lanc["valor"]),
-                lanc["historico"],
-                lanc["banco"],
-                lanc["arquivo_origem"],
-                lanc["fitid"],
-                lanc["checknum"],
-                lanc["assinatura"],
-                None    # conta_registro
-            ))
+def salvar_lancamento(lanc):
+    query = """
+        INSERT INTO lancamentos (data, valor, historico, banco, arquivo_origem, fitid, checknum, assinatura)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (fitid, banco, arquivo_origem) DO NOTHING
+    """
+    executar_query(query, (
+        str(lanc["data"]) if lanc["data"] else None,
+        float(lanc["valor"]) if lanc["valor"] is not None else None,
+        lanc["historico"],
+        lanc["banco"],
+        lanc["arquivo_origem"],
+        lanc["fitid"],
+        lanc["checknum"],
+        lanc["assinatura"]
+    ))
 
             if cur.rowcount > 0:
                 inseridos += 1
