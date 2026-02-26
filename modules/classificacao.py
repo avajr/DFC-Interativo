@@ -14,7 +14,6 @@ from modules.database import conectar
 # ============================================================
 # 🔹 SALVAR LANÇAMENTOS NO BANCO (EVITANDO DUPLICIDADE)
 # ============================================================
-
 def salvar_lancamentos(lancamentos):
     conn = conectar()
     cur = conn.cursor()
@@ -26,19 +25,27 @@ def salvar_lancamentos(lancamentos):
         try:
             cur.execute("""
                 INSERT INTO lancamentos (
-                    data, valor, banco, historico, conta_registro
+                    data, valor, historico, banco, arquivo_origem, fitid, checknum, assinatura, conta_registro
                 )
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT DO NOTHING
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (fitid, banco, arquivo_origem) DO NOTHING
             """, (
                 str(pd.to_datetime(lanc["data"]).date()),
                 float(lanc["valor"]),
-                lanc["banco"],
                 lanc["historico"],
+                lanc["banco"],
+                lanc["arquivo_origem"],
+                lanc["fitid"],
+                lanc["checknum"],
+                lanc["assinatura"],
                 None    # conta_registro
             ))
 
-            inseridos += 1
+            # Se realmente inseriu, incrementa
+            if cur.rowcount > 0:
+                inseridos += 1
+            else:
+                ignorados += 1
 
         except Exception as e:
             st.error(f"ERRO AO INSERIR: {e}")
@@ -53,7 +60,6 @@ def salvar_lancamentos(lancamentos):
 # ============================================================
 # 🔹 CARREGAR LANÇAMENTOS
 # ============================================================
-
 def carregar_lancamentos():
     conn = conectar()
     query = """
@@ -78,7 +84,6 @@ def carregar_lancamentos():
 # ============================================================
 # 🔹 SALVAR CLASSIFICAÇÃO DE UM LANÇAMENTO
 # ============================================================
-
 def classificar_lancamento(id_lancamento, conta_registro):
     conn = conectar()
     cur = conn.cursor()
