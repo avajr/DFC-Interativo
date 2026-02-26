@@ -388,39 +388,37 @@ else:
                     for _, row in df_sub.iterrows():
                         st.markdown(f"- **{row['registro']} — {row['nome_registro']}**")
 
-    # ============================================================
-    # 📥 IMPORTAÇÃO DE ARQUIVOS OFX
-    # ============================================================
-    with aba_importacao:
-        st.subheader("📥 Importação de Arquivos OFX")
-
-        from modules.ofx_reader import ler_ofx
-        from modules.classificacao import (
-            salvar_lancamentos,
-            carregar_lancamentos,
-            classificar_lancamento
-        )
-
-        uploaded_file = st.file_uploader("Selecione um arquivo OFX", type=["ofx"], key="upload_ofx")
-
-        if uploaded_file:
-            from modules.ofx_reader import ler_ofx, arquivo_ja_importado, importar_ofx
-
-            lancamentos = ler_ofx(uploaded_file)
-            st.session_state["lancamentos_ofx"] = lancamentos
-
-            # 🚨 Verificação imediata logo após upload
-            if arquivo_ja_importado(lancamentos):
-                st.warning("Arquivo já importado anteriormente. Nenhum lançamento novo.")
-            else:
-                st.info(f"{len(lancamentos)} lançamentos encontrados no arquivo.")
-
-            if st.button("Importar lançamentos"):
-                inseridos, ignorados = importar_ofx(uploaded_file)
-                if inseridos == 0 and ignorados > 0:
-                    st.warning("Nenhum lançamento novo adicionado.")
+        # ============================================================
+        # 📥 IMPORTAÇÃO DE ARQUIVOS OFX
+        # ============================================================
+        with aba_importacao:
+            st.subheader("📥 Importação de Arquivos OFX")
+        
+            from modules.ofx_reader import ler_ofx, importar_ofx
+            from modules.classificacao import (
+                salvar_lancamentos,
+                carregar_lancamentos,
+                classificar_lancamento
+            )
+        
+            uploaded_file = st.file_uploader("Selecione um arquivo OFX", type=["ofx"], key="upload_ofx")
+        
+            if uploaded_file:
+                lancamentos = ler_ofx(uploaded_file)
+                st.session_state["lancamentos_ofx"] = lancamentos
+        
+                # 🚨 Verificação imediata logo após upload
+                if len(lancamentos) == 0:
+                    st.warning("Nenhum lançamento encontrado no arquivo.")
                 else:
-                    st.success(f"{inseridos} lançamentos importados. {ignorados} ignorados.")
+                    st.info(f"{len(lancamentos)} lançamentos encontrados no arquivo.")
+        
+                if st.button("Importar lançamentos"):
+                    inseridos, ignorados = importar_ofx(uploaded_file)
+                    if inseridos == 0 and ignorados > 0:
+                        st.warning("Nenhum lançamento novo adicionado.")
+                    else:
+                        st.success(f"{inseridos} lançamentos importados. {ignorados} ignorados.")
 
     # ============================================================
     # 🧾 CLASSIFICAÇÃO DOS LANÇAMENTOS
