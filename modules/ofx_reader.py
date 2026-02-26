@@ -2,6 +2,8 @@ import hashlib
 import io
 from ofxparse import OfxParser
 from modules.database import executar_query
+from datetime import date
+from decimal import Decimal
 
 # ============================================================
 # 🔹 Geração de assinatura única para cada lançamento
@@ -56,6 +58,10 @@ def _extrair_lancamentos(ofx, arquivo):
 
     if not transacoes:
         print("[DEBUG] Nenhuma lista de transações encontrada. Atributos disponíveis:", dir(ofx))
+        if hasattr(ofx, "account"):
+            print("[DEBUG] ofx.account:", dir(ofx.account))
+        if hasattr(ofx.account, "statement"):
+            print("[DEBUG] ofx.account.statement:", dir(ofx.account.statement))
         return []
 
     for t in transacoes:
@@ -87,12 +93,15 @@ def existe_lancamento(lanc):
     if resultado[0][0] > 0:
         return True
 
-    # Verifica por checknum + banco + valor + data
+    # Verifica por checknum/refnum + banco + valor + data
     query = """
         SELECT COUNT(*) FROM lancamentos
         WHERE checknum = %s AND banco = %s AND valor = %s AND data = %s
     """
-    resultado = executar_query(query, (lanc["checknum"], lanc["banco"], lanc["valor"], lanc["data"]), fetch=True)
+    valor = Decimal(str(lanc["valor"])) if lanc["valor"] is not None else None
+    data = lanc["data"].date() if hasattr(lanc["data"], "date") else lanc["data"]
+
+    resultado = executar_query(query, (lanc["checknum"], lanc["banco"], valor, data), fetch=True)
     if resultado[0][0] > 0:
         return True
 
@@ -134,4 +143,3 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
-
