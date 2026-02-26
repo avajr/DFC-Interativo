@@ -37,25 +37,25 @@ def _parse_ofx(arquivo):
 # ============================================================
 def _extrair_lancamentos(ofx, arquivo):
     lancamentos = []
-    caminhos = [
-        "account.statement.transactions",
-        "account.transactions",
-        "statement.transactions",
-        "bank.account.statement.transactions"
+
+    # tenta encontrar qualquer atributo que seja uma lista de transações
+    transacoes = None
+    possiveis = [
+        getattr(ofx, "transactions", None),
+        getattr(ofx, "transaction_list", None),
+        getattr(getattr(ofx, "account", None), "transactions", None),
+        getattr(getattr(ofx, "account", None), "statement", None) and getattr(ofx.account.statement, "transactions", None),
+        getattr(getattr(ofx, "statement", None), "transactions", None),
+        getattr(getattr(ofx, "bank_account", None), "statement", None) and getattr(ofx.bank_account.statement, "transactions", None),
     ]
 
-    transacoes = None
-    for caminho in caminhos:
-        try:
-            obj = ofx
-            for parte in caminho.split("."):
-                obj = getattr(obj, parte)
-            transacoes = obj
+    for lista in possiveis:
+        if lista:
+            transacoes = lista
             break
-        except:
-            pass
 
     if not transacoes:
+        print("[DEBUG] Nenhuma lista de transações encontrada. Atributos disponíveis:", dir(ofx))
         return []
 
     for t in transacoes:
@@ -66,7 +66,8 @@ def _extrair_lancamentos(ofx, arquivo):
             "banco": getattr(ofx.account.institution, "organization", "BANCO_DESCONHECIDO"),
             "arquivo_origem": getattr(arquivo, "name", "OFX_DESCONHECIDO"),
             "fitid": getattr(t, "id", None),
-            "checknum": getattr(t, "checknum", None)
+            # Sicredi pode usar REFNUM em vez de CHECKNUM
+            "checknum": getattr(t, "checknum", None) or getattr(t, "refnum", None)
         }
         lanc["assinatura"] = gerar_assinatura(lanc)
         lancamentos.append(lanc)
@@ -133,3 +134,4 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
