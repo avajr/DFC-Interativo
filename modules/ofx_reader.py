@@ -1,5 +1,6 @@
 import hashlib
 import io
+import re
 from ofxparse import OfxParser
 from modules.database import executar_query
 from datetime import date
@@ -13,65 +14,63 @@ def gerar_assinatura(lanc):
     return hashlib.sha1(base.encode("utf-8")).hexdigest()
 
 # ============================================================
-# 🔹 Normalização de OFX SGML (Itaú, Bradesco, etc.)
+# 🔹 Parser manual para Itaú (OFX SGML)
 # ============================================================
-def normalizar_ofx_sgml(conteudo):
-    """
-    Converte OFX SGML (v1.02) em XML válido para o OfxParser.
-    """
-    # Remove cabeçalho
-    if conteudo.startswith("OFXHEADER"):
-        conteudo = conteudo.split("<OFX>", 1)[1]
-        conteudo = "<OFX>" + conteudo
+def ler_ofx_itau(texto, arquivo):
+    lancamentos = []
+    # Extrai blocos de transações
+    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL)
+    for trn in transacoes:
+        fitid = re.search(r"<FITID>(.*?)\n", trn)
+        checknum = re.search(r"<CHECKNUM>(.*?)\n", trn)
+        memo = re.search(r"<MEMO>(.*?)\n", trn)
+        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
+        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
 
-    # Fecha tags corretamente
-    linhas = []
-    for linha in conteudo.splitlines():
-        if linha.strip() and linha.strip().startswith("<") and not linha.strip().endswith(">"):
-            # Exemplo: <FITID>20250102001 -> vira <FITID>20250102001</FITID>
-            if ">" in linha:
-                tag, valor = linha.split(">", 1)
-                tagname = tag.replace("<", "").strip()
-                linhas.append(f"<{tagname}>{valor.strip()}</{tagname}>")
-            else:
-                linhas.append(linha)
-        else:
-            linhas.append(linha)
-    return "\n".join(linhas)
+        lanc = {
+            "fitid": fitid.group(1).strip() if fitid else None,
+            "checknum": checknum.group(1).strip() if checknum else None,
+            "historico": memo.group(1).strip() if memo else None,
+            "valor": float(valor.group(1)) if valor else 0.0,
+            "data": data.group(1).strip() if data else None,
+            "banco": "ITAÚ",
+            "arquivo_origem": getattr(arquivo, "name", "OFX_ITAU"),
+        }
+        lanc["assinatura"] = gerar_assinatura(lanc)
+        lancamentos.append(lanc)
+    return lancamentos
 
 # ============================================================
-# 🔹 Leitura do arquivo OFX
+# 🔹 Leitura do arquivo OFX (detecta Itaú vs outros bancos)
 # ============================================================
 def ler_ofx(arquivo):
-    try:
-        return _parse_ofx(arquivo)
-    except UnicodeDecodeError:
-        content = arquivo.read()
-        encodings = ["utf-8", "latin-1", "cp1252"]
-        for enc in encodings:
-            try:
-                text = content.decode(enc)
-                # Normaliza SGML -> XML se necessário
-                if "OFXHEADER" in text:
-                    text = normalizar_ofx_sgml(text)
+    content = arquivo.read()
+    encodings = ["utf-8", "latin-1", "cp1252"]
+    for enc in encodings:
+        try:
+            text = content.decode(enc)
+            # Detecta Itaú (SGML)
+            if "OFXHEADER" in text and "DATA:OFXSGML" in text:
+                print("[DEBUG] Detectado arquivo SGML (Itaú). Usando parser manual.")
+                return ler_ofx_itau(text, arquivo)
+            else:
                 ofx = OfxParser.parse(io.StringIO(text))
                 return _extrair_lancamentos(ofx, arquivo)
-            except Exception as e:
-                print("[DEBUG] Falha ao parsear com encoding", enc, "erro:", e)
-                continue
-        return []
+        except Exception as e:
+            print("[DEBUG] Falha ao parsear com encoding", enc, "erro:", e)
+            continue
+    return []
 
 def _parse_ofx(arquivo):
     ofx = OfxParser.parse(arquivo)
     return _extrair_lancamentos(ofx, arquivo)
 
 # ============================================================
-# 🔹 Extração dos lançamentos do OFX
+# 🔹 Extração dos lançamentos do OFX (Banco do Brasil, Sicredi)
 # ============================================================
 def _extrair_lancamentos(ofx, arquivo):
     lancamentos = []
 
-    # tenta encontrar qualquer atributo que seja uma lista de transações
     transacoes = None
     possiveis = [
         getattr(ofx, "transactions", None),
@@ -89,10 +88,6 @@ def _extrair_lancamentos(ofx, arquivo):
 
     if not transacoes:
         print("[DEBUG] Nenhuma lista de transações encontrada. Atributos disponíveis:", dir(ofx))
-        if hasattr(ofx, "account"):
-            print("[DEBUG] ofx.account:", dir(ofx.account))
-        if hasattr(ofx.account, "statement"):
-            print("[DEBUG] ofx.account.statement:", dir(ofx.account.statement))
         return []
 
     for t in transacoes:
@@ -103,7 +98,6 @@ def _extrair_lancamentos(ofx, arquivo):
             "banco": getattr(ofx.account.institution, "organization", "BANCO_DESCONHECIDO"),
             "arquivo_origem": getattr(arquivo, "name", "OFX_DESCONHECIDO"),
             "fitid": getattr(t, "id", None),
-            # Sicredi pode usar REFNUM em vez de CHECKNUM
             "checknum": getattr(t, "checknum", None) or getattr(t, "refnum", None)
         }
         lanc["assinatura"] = gerar_assinatura(lanc)
