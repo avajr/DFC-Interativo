@@ -79,22 +79,7 @@ def _parse_ofx(arquivo):
 # ============================================================
 # 🔹 Inserção de lançamento (ignora duplicados)
 # ============================================================
-def salvar_lancamento(lanc):
-    query = """
-        INSERT INTO lancamentos (data, valor, historico, banco, arquivo_origem, fitid, checknum, assinatura)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (fitid, banco, arquivo_origem) DO NOTHING
-    """
-    executar_query(query, (
-        lanc["data"],
-        float(lanc["valor"]) if lanc["valor"] is not None else None,
-        lanc["historico"],
-        lanc["banco"],
-        lanc["arquivo_origem"],
-        lanc["fitid"],
-        lanc["checknum"],
-        lanc["assinatura"]
-    ))
+
 
 # ============================================================
 # 🔹 Importação do arquivo OFX
@@ -110,4 +95,5 @@ def importar_ofx(arquivo):
             ignorados += 1
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
