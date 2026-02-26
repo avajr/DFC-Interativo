@@ -77,17 +77,7 @@ def _extrair_lancamentos(ofx, arquivo):
 # ============================================================
 # 🔹 Verificação de duplicidade (exata: data + valor + historico)
 # ============================================================
-def existe_lancamento(lanc):
-    query = """
-        SELECT COUNT(*) FROM lancamentos
-        WHERE data = %s AND valor = %s AND historico = %s
-    """
-    resultado = executar_query(query, (
-        lanc["data"],
-        float(lanc["valor"]) if lanc["valor"] is not None else None,
-        lanc["historico"]
-    ), fetch=True)
-    return resultado[0][0] > 0
+
 
 # ============================================================
 # 🔹 Inserção de lançamento
@@ -119,3 +109,4 @@ def importar_ofx(arquivo):
             ignorados += 1
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
