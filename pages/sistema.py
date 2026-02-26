@@ -394,9 +394,8 @@ else:
         with aba_importacao:
             st.subheader("📥 Importação de Arquivos OFX")
         
-            from modules.ofx_reader import ler_ofx, importar_ofx
+            from modules.ofx_reader import ler_ofx, salvar_lancamento, existe_lancamento
             from modules.classificacao import (
-                salvar_lancamentos,
                 carregar_lancamentos,
                 classificar_lancamento
             )
@@ -404,6 +403,7 @@ else:
             uploaded_file = st.file_uploader("Selecione um arquivo OFX", type=["ofx"], key="upload_ofx")
         
             if uploaded_file:
+                # Ler o arquivo apenas uma vez
                 lancamentos = ler_ofx(uploaded_file)
                 st.session_state["lancamentos_ofx"] = lancamentos
         
@@ -413,8 +413,16 @@ else:
                 else:
                     st.info(f"{len(lancamentos)} lançamentos encontrados no arquivo.")
         
+                # Botão para importar lançamentos
                 if st.button("Importar lançamentos"):
-                    inseridos, ignorados = importar_ofx(uploaded_file)
+                    inseridos, ignorados = 0, 0
+                    for lanc in st.session_state["lancamentos_ofx"]:
+                        if not existe_lancamento(lanc):
+                            salvar_lancamento(lanc)
+                            inseridos += 1
+                        else:
+                            ignorados += 1
+        
                     if inseridos == 0 and ignorados > 0:
                         st.warning("Nenhum lançamento novo adicionado.")
                     else:
