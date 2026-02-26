@@ -132,18 +132,13 @@ def salvar_lancamento(lanc):
         VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (data, valor, historico) DO NOTHING
     """
-
-    executar_query(
-        query,
-        (
-            lanc["data"],
-            float(lanc["valor"]) if lanc["valor"] is not None else None,
-            lanc["historico"],
-            lanc["banco"],
-            lanc["arquivo_origem"]
-        )
-    )
-
+    executar_query(query, (
+        str(lanc["data"]),  # força string no formato YYYY-MM-DD
+        float(lanc["valor"]) if lanc["valor"] is not None else None,
+        lanc["historico"],
+        lanc["banco"],
+        lanc["arquivo_origem"]
+    ))
 
 # ============================================================
 # 🔹 Importação do arquivo OFX
@@ -174,3 +169,4 @@ def importar_ofx(arquivo):
     )
 
     return inseridos, ignorados
+
