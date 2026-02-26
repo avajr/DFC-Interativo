@@ -2,7 +2,9 @@ import psycopg2
 import streamlit as st
 import pandas as pd
 
-# Função de conexão com Supabase/Postgres
+# ------------------------------------------------------------
+# 🔹 Conexão com Supabase/Postgres
+# ------------------------------------------------------------
 def conectar():
     return psycopg2.connect(
         host=st.secrets["PGHOST"],
@@ -12,24 +14,32 @@ def conectar():
         password=st.secrets["PGPASSWORD"]
     )
 
-# Função genérica para executar queries
+# ------------------------------------------------------------
+# 🔹 Função genérica para executar queries
+# ------------------------------------------------------------
 def executar_query(query, params=None, fetch=False):
     conn = conectar()
     cur = conn.cursor()
     cur.execute(query, params or ())
     result = None
     if fetch:
-        result = cur.fetchall()
+        try:
+            result = cur.fetchall()
+        except psycopg2.ProgrammingError:
+            result = None
     conn.commit()
     cur.close()
     conn.close()
     return result
 
-# Criar tabelas no banco Supabase
+# ------------------------------------------------------------
+# 🔹 Criar tabelas no banco Supabase
+# ------------------------------------------------------------
 def criar_tabelas():
     conn = conectar()
     cur = conn.cursor()
 
+    # Tabela de lançamentos
     cur.execute("""
         CREATE TABLE IF NOT EXISTS lancamentos (
             id SERIAL PRIMARY KEY,
@@ -39,14 +49,12 @@ def criar_tabelas():
             historico TEXT,
             conta_registro TEXT,
             arquivo_origem TEXT,
-            fitid TEXT,
-            checknum TEXT,
-            assinatura TEXT,
-            UNIQUE (fitid, checknum, banco, arquivo_origem),
-            UNIQUE (assinatura, banco)
+            -- 🔹 Constraint simplificada: só considera duplicado se data+valor+historico forem iguais
+            UNIQUE (data, valor, historico)
         )
     """)
 
+    # Tabela de contas contábeis
     cur.execute("""
         CREATE TABLE IF NOT EXISTS contas (
             mestre TEXT,
@@ -63,7 +71,9 @@ def criar_tabelas():
     cur.close()
     conn.close()
 
-# Importar contas de um Excel para Supabase
+# ------------------------------------------------------------
+# 🔹 Importar contas de um Excel para Supabase
+# ------------------------------------------------------------
 def importar_contas_excel(arquivo):
     conn = conectar()
     df = pd.read_excel(arquivo)
@@ -99,7 +109,9 @@ def importar_contas_excel(arquivo):
     cur.close()
     conn.close()
 
-# Atualizar lançamentos
+# ------------------------------------------------------------
+# 🔹 Atualizar lançamentos (classificação)
+# ------------------------------------------------------------
 def atualizar_lancamentos(id_lancamentos, registro):
     conn = conectar()
     cursor = conn.cursor()
