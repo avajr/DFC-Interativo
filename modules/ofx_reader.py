@@ -4,7 +4,6 @@ import re
 from ofxparse import OfxParser
 from modules.database import executar_query
 from datetime import datetime, date
-from decimal import Decimal
 
 # ============================================================
 # 🔹 Geração de assinatura única para cada lançamento
@@ -112,6 +111,7 @@ def _extrair_lancamentos(ofx, arquivo):
 # 🔹 Verificação de duplicidade
 # ============================================================
 def existe_lancamento(lanc):
+    # Verifica por fitid + banco + arquivo
     query = """
         SELECT COUNT(*) FROM lancamentos
         WHERE fitid = %s AND banco = %s AND arquivo_origem = %s
@@ -120,17 +120,19 @@ def existe_lancamento(lanc):
     if resultado[0][0] > 0:
         return True
 
+    # Verifica por checknum/refnum + banco + valor + data
     query = """
         SELECT COUNT(*) FROM lancamentos
         WHERE checknum = %s AND banco = %s AND valor = %s AND data = %s
     """
-    valor = Decimal(str(lanc["valor"])) if lanc["valor"] is not None else None
+    valor = float(lanc["valor"]) if lanc["valor"] is not None else None
     data = lanc["data"].date() if hasattr(lanc["data"], "date") else lanc["data"]
 
     resultado = executar_query(query, (lanc["checknum"], lanc["banco"], valor, data), fetch=True)
     if resultado[0][0] > 0:
         return True
 
+    # Verifica por assinatura + banco
     query = """
         SELECT COUNT(*) FROM lancamentos
         WHERE assinatura = %s AND banco = %s
@@ -148,8 +150,14 @@ def salvar_lancamento(lanc):
         ON CONFLICT (fitid, banco, arquivo_origem) DO NOTHING
     """
     executar_query(query, (
-        lanc["data"], lanc["valor"], lanc["historico"], lanc["banco"],
-        lanc["arquivo_origem"], lanc["fitid"], lanc["checknum"], lanc["assinatura"]
+        lanc["data"],
+        float(lanc["valor"]) if lanc["valor"] is not None else None,
+        lanc["historico"],
+        lanc["banco"],
+        lanc["arquivo_origem"],
+        lanc["fitid"],
+        lanc["checknum"],
+        lanc["assinatura"]
     ))
 
 # ============================================================
@@ -166,3 +174,4 @@ def importar_ofx(arquivo):
             ignorados += 1
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
