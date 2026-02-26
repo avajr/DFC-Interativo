@@ -3,7 +3,7 @@ import io
 import re
 from ofxparse import OfxParser
 from modules.database import executar_query
-from datetime import date
+from datetime import datetime, date
 from decimal import Decimal
 
 # ============================================================
@@ -18,7 +18,6 @@ def gerar_assinatura(lanc):
 # ============================================================
 def ler_ofx_itau(texto, arquivo):
     lancamentos = []
-    # Extrai blocos de transações
     transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL)
     for trn in transacoes:
         fitid = re.search(r"<FITID>(.*?)\n", trn)
@@ -27,12 +26,21 @@ def ler_ofx_itau(texto, arquivo):
         valor = re.search(r"<TRNAMT>(.*?)\n", trn)
         data = re.search(r"<DTPOSTED>(.*?)\n", trn)
 
+        # Converte data do formato Itaú (YYYYMMDDHHMMSS[-TZ]) para datetime.date
+        data_valor = None
+        if data:
+            raw = data.group(1).strip()
+            try:
+                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
+            except Exception:
+                data_valor = None
+
         lanc = {
             "fitid": fitid.group(1).strip() if fitid else None,
             "checknum": checknum.group(1).strip() if checknum else None,
             "historico": memo.group(1).strip() if memo else None,
             "valor": float(valor.group(1)) if valor else 0.0,
-            "data": data.group(1).strip() if data else None,
+            "data": data_valor,
             "banco": "ITAÚ",
             "arquivo_origem": getattr(arquivo, "name", "OFX_ITAU"),
         }
@@ -49,7 +57,6 @@ def ler_ofx(arquivo):
     for enc in encodings:
         try:
             text = content.decode(enc)
-            # Detecta Itaú (SGML)
             if "OFXHEADER" in text and "DATA:OFXSGML" in text:
                 print("[DEBUG] Detectado arquivo SGML (Itaú). Usando parser manual.")
                 return ler_ofx_itau(text, arquivo)
@@ -70,7 +77,6 @@ def _parse_ofx(arquivo):
 # ============================================================
 def _extrair_lancamentos(ofx, arquivo):
     lancamentos = []
-
     transacoes = None
     possiveis = [
         getattr(ofx, "transactions", None),
@@ -80,19 +86,17 @@ def _extrair_lancamentos(ofx, arquivo):
         getattr(getattr(ofx, "statement", None), "transactions", None),
         getattr(getattr(ofx, "bank_account", None), "statement", None) and getattr(ofx.bank_account.statement, "transactions", None),
     ]
-
     for lista in possiveis:
         if lista:
             transacoes = lista
             break
-
     if not transacoes:
         print("[DEBUG] Nenhuma lista de transações encontrada. Atributos disponíveis:", dir(ofx))
         return []
 
     for t in transacoes:
         lanc = {
-            "data": t.date,
+            "data": t.date.date() if hasattr(t.date, "date") else t.date,
             "valor": float(t.amount),
             "historico": t.memo,
             "banco": getattr(ofx.account.institution, "organization", "BANCO_DESCONHECIDO"),
@@ -102,14 +106,12 @@ def _extrair_lancamentos(ofx, arquivo):
         }
         lanc["assinatura"] = gerar_assinatura(lanc)
         lancamentos.append(lanc)
-
     return lancamentos
 
 # ============================================================
 # 🔹 Verificação de duplicidade
 # ============================================================
 def existe_lancamento(lanc):
-    # Verifica por fitid + banco + arquivo
     query = """
         SELECT COUNT(*) FROM lancamentos
         WHERE fitid = %s AND banco = %s AND arquivo_origem = %s
@@ -118,7 +120,6 @@ def existe_lancamento(lanc):
     if resultado[0][0] > 0:
         return True
 
-    # Verifica por checknum/refnum + banco + valor + data
     query = """
         SELECT COUNT(*) FROM lancamentos
         WHERE checknum = %s AND banco = %s AND valor = %s AND data = %s
@@ -130,7 +131,6 @@ def existe_lancamento(lanc):
     if resultado[0][0] > 0:
         return True
 
-    # Verifica por assinatura + banco
     query = """
         SELECT COUNT(*) FROM lancamentos
         WHERE assinatura = %s AND banco = %s
@@ -157,7 +157,6 @@ def salvar_lancamento(lanc):
 # ============================================================
 def importar_ofx(arquivo):
     lancamentos = ler_ofx(arquivo)
-
     inseridos, ignorados = 0, 0
     for lanc in lancamentos:
         if not existe_lancamento(lanc):
@@ -165,6 +164,5 @@ def importar_ofx(arquivo):
             inseridos += 1
         else:
             ignorados += 1
-
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
