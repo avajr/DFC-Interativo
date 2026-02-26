@@ -74,40 +74,6 @@ def _parse_ofx(arquivo):
 # ============================================================
 # 🔹 Extração dos lançamentos do OFX (Banco do Brasil, Sicredi)
 # ============================================================
-def existe_lancamento(lanc):
-    # Verifica por fitid + banco + arquivo
-    if lanc["fitid"]:
-        query = """
-            SELECT COUNT(*) FROM lancamentos
-            WHERE fitid = %s AND banco = %s AND arquivo_origem = %s
-        """
-        resultado = executar_query(query, (lanc["fitid"], lanc["banco"], lanc["arquivo_origem"]), fetch=True)
-        if resultado[0][0] > 0:
-            return True
-
-    # Verifica por checknum/refnum + banco + valor + data
-    if lanc["checknum"] and lanc["data"]:
-        query = """
-            SELECT COUNT(*) FROM lancamentos
-            WHERE checknum = %s AND banco = %s AND valor = %s AND data = %s
-        """
-        valor = float(lanc["valor"]) if lanc["valor"] is not None else None
-        data = lanc["data"].date() if hasattr(lanc["data"], "date") else lanc["data"]
-        resultado = executar_query(query, (lanc["checknum"], lanc["banco"], valor, data), fetch=True)
-        if resultado[0][0] > 0:
-            return True
-
-    # Verifica por assinatura + banco
-    query = """
-        SELECT COUNT(*) FROM lancamentos
-        WHERE assinatura = %s AND banco = %s
-    """
-    resultado = executar_query(query, (lanc["assinatura"], lanc["banco"]), fetch=True)
-    return resultado[0][0] > 0
-    
-# ============================================================
-# 🔹 Verificação de duplicidade
-# ============================================================
 
 
 # ============================================================
@@ -144,6 +110,4 @@ def importar_ofx(arquivo):
             ignorados += 1
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
-
-
 
