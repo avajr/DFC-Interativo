@@ -106,22 +106,33 @@ if permissao in ["visualizador", "visitante"]:
         # 🎛️ Filtros (na sidebar)
         # ============================================================
         st.sidebar.markdown("### 🎛️ Filtros")
-
-        data_inicio = st.sidebar.date_input(
-            "Data inicial",
-            value=pd.to_datetime(df_lanc["data"]).min().date()
-        )
-        data_fim = st.sidebar.date_input(
-            "Data final",
-            value=pd.to_datetime(df_lanc["data"]).max().date()
-        )
-
+        
+        # Converter coluna para datetime, ignorando erros
+        df_lanc["data"] = pd.to_datetime(df_lanc["data"], errors="coerce")
+        
+        # Remover valores nulos
+        datas_validas = df_lanc["data"].dropna()
+        
+        # Definir valores padrão seguros
+        if len(datas_validas) > 0:
+            data_inicial_padrao = datas_validas.min().date()
+            data_final_padrao = datas_validas.max().date()
+        else:
+            hoje = pd.Timestamp.today().date()
+            data_inicial_padrao = hoje
+            data_final_padrao = hoje
+        
+        # Usar no date_input
+        data_inicio = st.sidebar.date_input("Data inicial", value=data_inicial_padrao)
+        data_fim = st.sidebar.date_input("Data final", value=data_final_padrao)
+        
+        # Filtros de Mestre, Subchave e Registro
         mestres_opcoes = sorted(df_lanc["mestre"].dropna().unique(), key=lambda x: float(x))
         mestre_sel = st.sidebar.multiselect("Filtrar por Mestre", options=mestres_opcoes)
-
+        
         subchaves_opcoes = sorted(df_lanc["subchave"].dropna().unique(), key=lambda x: float(x))
         subchave_sel = st.sidebar.multiselect("Filtrar por Subchave", options=subchaves_opcoes)
-
+        
         registros_opcoes = sorted(df_lanc["registro"].dropna().unique(), key=lambda x: float(x.replace(".", "")))
         registro_sel = st.sidebar.multiselect("Filtrar por Registro", options=registros_opcoes)
 
@@ -129,17 +140,21 @@ if permissao in ["visualizador", "visitante"]:
         # 🔹 Aplicar filtros
         # ============================================================
         df_filtrado = df_lanc.copy()
+        
+        # Aqui você já converteu df_lanc["data"] para datetime com errors="coerce"
+        # Então pode usar direto sem reconverter
         df_filtrado = df_filtrado[
-            (pd.to_datetime(df_filtrado["data"]).dt.date >= data_inicio) &
-            (pd.to_datetime(df_filtrado["data"]).dt.date <= data_fim)
+            (df_filtrado["data"].dt.date >= data_inicio) &
+            (df_filtrado["data"].dt.date <= data_fim)
         ]
-
+        
         if mestre_sel:
             df_filtrado = df_filtrado[df_filtrado["mestre"].isin(mestre_sel)]
         if subchave_sel:
             df_filtrado = df_filtrado[df_filtrado["subchave"].isin(subchave_sel)]
         if registro_sel:
             df_filtrado = df_filtrado[df_filtrado["registro"].isin(registro_sel)]
+
 
         # ============================================================
         # 🔹 Drill-down e gráficos
