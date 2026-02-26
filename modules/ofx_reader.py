@@ -13,6 +13,33 @@ def gerar_assinatura(lanc):
     return hashlib.sha1(base.encode("utf-8")).hexdigest()
 
 # ============================================================
+# 🔹 Normalização de OFX SGML (Itaú, Bradesco, etc.)
+# ============================================================
+def normalizar_ofx_sgml(conteudo):
+    """
+    Converte OFX SGML (v1.02) em XML válido para o OfxParser.
+    """
+    # Remove cabeçalho
+    if conteudo.startswith("OFXHEADER"):
+        conteudo = conteudo.split("<OFX>", 1)[1]
+        conteudo = "<OFX>" + conteudo
+
+    # Fecha tags corretamente
+    linhas = []
+    for linha in conteudo.splitlines():
+        if linha.strip() and linha.strip().startswith("<") and not linha.strip().endswith(">"):
+            # Exemplo: <FITID>20250102001 -> vira <FITID>20250102001</FITID>
+            if ">" in linha:
+                tag, valor = linha.split(">", 1)
+                tagname = tag.replace("<", "").strip()
+                linhas.append(f"<{tagname}>{valor.strip()}</{tagname}>")
+            else:
+                linhas.append(linha)
+        else:
+            linhas.append(linha)
+    return "\n".join(linhas)
+
+# ============================================================
 # 🔹 Leitura do arquivo OFX
 # ============================================================
 def ler_ofx(arquivo):
@@ -24,9 +51,13 @@ def ler_ofx(arquivo):
         for enc in encodings:
             try:
                 text = content.decode(enc)
+                # Normaliza SGML -> XML se necessário
+                if "OFXHEADER" in text:
+                    text = normalizar_ofx_sgml(text)
                 ofx = OfxParser.parse(io.StringIO(text))
                 return _extrair_lancamentos(ofx, arquivo)
-            except Exception:
+            except Exception as e:
+                print("[DEBUG] Falha ao parsear com encoding", enc, "erro:", e)
                 continue
         return []
 
