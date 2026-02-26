@@ -41,7 +41,6 @@ def salvar_lancamentos(lancamentos):
                 None    # conta_registro
             ))
 
-            # Se realmente inseriu, incrementa
             if cur.rowcount > 0:
                 inseridos += 1
             else:
