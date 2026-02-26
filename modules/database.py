@@ -40,17 +40,19 @@ def criar_tabelas():
     cur = conn.cursor()
 
     # Tabela de lançamentos
-DROP TABLE IF EXISTS lancamentos;
-CREATE TABLE lancamentos (
-    id SERIAL PRIMARY KEY,
-    data DATE,
-    valor NUMERIC(12,2),
-    banco TEXT,
-    historico TEXT,
-    conta_registro TEXT,
-    arquivo_origem TEXT,
-    UNIQUE (data, valor, historico)
-);
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS lancamentos (
+            id SERIAL PRIMARY KEY,
+            data DATE,
+            valor NUMERIC(12,2),
+            banco TEXT,
+            historico TEXT,
+            conta_registro TEXT,
+            arquivo_origem TEXT,
+            -- 🔹 Constraint simplificada: só considera duplicado se data+valor+historico forem iguais
+            UNIQUE (data, valor, historico)
+        )
+    """)
 
     # Tabela de contas contábeis
     cur.execute("""
@@ -121,4 +123,3 @@ def atualizar_lancamentos(id_lancamentos, registro):
     conn.commit()
     cursor.close()
     conn.close()
-
