@@ -1,16 +1,8 @@
-import hashlib
 import io
 import re
 from ofxparse import OfxParser
 from modules.database import executar_query
-from datetime import datetime, date
-
-# ============================================================
-# 🔹 Geração de assinatura única para cada lançamento
-# ============================================================
-def gerar_assinatura(lanc):
-    base = f"{lanc['data']}{lanc['valor']}{lanc['historico']}{lanc['banco']}"
-    return hashlib.sha1(base.encode("utf-8")).hexdigest()
+from datetime import datetime
 
 # ============================================================
 # 🔹 Parser manual para Itaú (OFX SGML)
@@ -25,7 +17,6 @@ def ler_ofx_itau(texto, arquivo):
         valor = re.search(r"<TRNAMT>(.*?)\n", trn)
         data = re.search(r"<DTPOSTED>(.*?)\n", trn)
 
-        # Converte data do formato Itaú (YYYYMMDDHHMMSS[-TZ]) para datetime.date
         data_valor = None
         if data:
             raw = data.group(1).strip()
@@ -43,7 +34,6 @@ def ler_ofx_itau(texto, arquivo):
             "banco": "ITAÚ",
             "arquivo_origem": getattr(arquivo, "name", "OFX_ITAU"),
         }
-        lanc["assinatura"] = gerar_assinatura(lanc)
         lancamentos.append(lanc)
     return lancamentos
 
@@ -67,85 +57,52 @@ def ler_ofx(arquivo):
             continue
     return []
 
-def _parse_ofx(arquivo):
-    ofx = OfxParser.parse(arquivo)
-    return _extrair_lancamentos(ofx, arquivo)
-
 # ============================================================
 # 🔹 Extração dos lançamentos do OFX (Banco do Brasil, Sicredi)
 # ============================================================
-def existe_lancamento(lanc):
-    # Verifica por fitid + banco + arquivo
-    if lanc["fitid"]:
-        query = """
-            SELECT COUNT(*) FROM lancamentos
-            WHERE fitid = %s AND banco = %s AND arquivo_origem = %s
-        """
-        resultado = executar_query(query, (lanc["fitid"], lanc["banco"], lanc["arquivo_origem"]), fetch=True)
-        if resultado[0][0] > 0:
-            return True
+def _extrair_lancamentos(ofx, arquivo):
+    lancamentos = []
+    transacoes = getattr(ofx, "transactions", None) or getattr(ofx.account, "transactions", None)
+    if not transacoes:
+        print("[DEBUG] Nenhuma lista de transações encontrada.")
+        return []
 
-    # Verifica por checknum/refnum + banco + valor + data
-    if lanc["checknum"] and lanc["data"]:
-        query = """
-            SELECT COUNT(*) FROM lancamentos
-            WHERE checknum = %s AND banco = %s AND valor = %s AND data = %s
-        """
-        valor = float(lanc["valor"]) if lanc["valor"] is not None else None
-        data = lanc["data"].date() if hasattr(lanc["data"], "date") else lanc["data"]
-        resultado = executar_query(query, (lanc["checknum"], lanc["banco"], valor, data), fetch=True)
-        if resultado[0][0] > 0:
-            return True
+    for t in transacoes:
+        lanc = {
+            "data": t.date.date() if hasattr(t.date, "date") else t.date,
+            "valor": float(t.amount),
+            "historico": t.memo,
+            "banco": getattr(ofx.account.institution, "organization", "BANCO_DESCONHECIDO"),
+            "arquivo_origem": getattr(arquivo, "name", "OFX_DESCONHECIDO"),
+            "fitid": getattr(t, "id", None),
+            "checknum": getattr(t, "checknum", None) or getattr(t, "refnum", None)
+        }
+        lancamentos.append(lanc)
+    return lancamentos
 
-    # Verifica por assinatura + banco
-    query = """
-        SELECT COUNT(*) FROM lancamentos
-        WHERE assinatura = %s AND banco = %s
-    """
-    resultado = executar_query(query, (lanc["assinatura"], lanc["banco"]), fetch=True)
-    return resultado[0][0] > 0
-    
 # ============================================================
-# 🔹 Verificação de duplicidade
+# 🔹 Verificação de duplicidade (exata)
 # ============================================================
 def existe_lancamento(lanc):
-    # Verifica por fitid + banco + arquivo
     query = """
         SELECT COUNT(*) FROM lancamentos
-        WHERE fitid = %s AND banco = %s AND arquivo_origem = %s
+        WHERE data = %s AND valor = %s AND historico = %s AND fitid = %s
     """
-    resultado = executar_query(query, (lanc["fitid"], lanc["banco"], lanc["arquivo_origem"]), fetch=True)
-    if resultado[0][0] > 0:
-        return True
-
-    # Verifica por checknum/refnum + banco + valor + data
-    query = """
-        SELECT COUNT(*) FROM lancamentos
-        WHERE checknum = %s AND banco = %s AND valor = %s AND data = %s
-    """
-    valor = float(lanc["valor"]) if lanc["valor"] is not None else None
-    data = lanc["data"].date() if hasattr(lanc["data"], "date") else lanc["data"]
-
-    resultado = executar_query(query, (lanc["checknum"], lanc["banco"], valor, data), fetch=True)
-    if resultado[0][0] > 0:
-        return True
-
-    # Verifica por assinatura + banco
-    query = """
-        SELECT COUNT(*) FROM lancamentos
-        WHERE assinatura = %s AND banco = %s
-    """
-    resultado = executar_query(query, (lanc["assinatura"], lanc["banco"]), fetch=True)
+    resultado = executar_query(query, (
+        lanc["data"],
+        float(lanc["valor"]) if lanc["valor"] is not None else None,
+        lanc["historico"],
+        lanc["fitid"]
+    ), fetch=True)
     return resultado[0][0] > 0
 
 # ============================================================
-# 🔹 Inserção de lançamento (ignora duplicados)
+# 🔹 Inserção de lançamento
 # ============================================================
 def salvar_lancamento(lanc):
     query = """
-        INSERT INTO lancamentos (data, valor, historico, banco, arquivo_origem, fitid, checknum, assinatura)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (fitid, banco, arquivo_origem) DO NOTHING
+        INSERT INTO lancamentos (data, valor, historico, banco, arquivo_origem, fitid, checknum)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
     executar_query(query, (
         lanc["data"],
@@ -154,8 +111,7 @@ def salvar_lancamento(lanc):
         lanc["banco"],
         lanc["arquivo_origem"],
         lanc["fitid"],
-        lanc["checknum"],
-        lanc["assinatura"]
+        lanc["checknum"]
     ))
 
 # ============================================================
@@ -172,4 +128,3 @@ def importar_ofx(arquivo):
             ignorados += 1
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
-
