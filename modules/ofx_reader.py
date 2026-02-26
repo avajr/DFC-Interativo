@@ -11,8 +11,6 @@ def ler_ofx_itau(texto, arquivo):
     lancamentos = []
     transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL)
     for trn in transacoes:
-        fitid = re.search(r"<FITID>(.*?)\n", trn)
-        checknum = re.search(r"<CHECKNUM>(.*?)\n", trn)
         memo = re.search(r"<MEMO>(.*?)\n", trn)
         valor = re.search(r"<TRNAMT>(.*?)\n", trn)
         data = re.search(r"<DTPOSTED>(.*?)\n", trn)
@@ -26,8 +24,6 @@ def ler_ofx_itau(texto, arquivo):
                 data_valor = None
 
         lanc = {
-            "fitid": fitid.group(1).strip() if fitid else None,
-            "checknum": checknum.group(1).strip() if checknum else None,
             "historico": memo.group(1).strip() if memo else None,
             "valor": float(valor.group(1)) if valor else 0.0,
             "data": data_valor,
@@ -58,7 +54,7 @@ def ler_ofx(arquivo):
     return []
 
 # ============================================================
-# 🔹 Extração dos lançamentos do OFX (Banco do Brasil, Sicredi)
+# 🔹 Extração dos lançamentos do OFX (Santander, BB, Sicredi)
 # ============================================================
 def _extrair_lancamentos(ofx, arquivo):
     lancamentos = []
@@ -74,25 +70,22 @@ def _extrair_lancamentos(ofx, arquivo):
             "historico": t.memo,
             "banco": getattr(ofx.account.institution, "organization", "BANCO_DESCONHECIDO"),
             "arquivo_origem": getattr(arquivo, "name", "OFX_DESCONHECIDO"),
-            "fitid": getattr(t, "id", None),
-            "checknum": getattr(t, "checknum", None) or getattr(t, "refnum", None)
         }
         lancamentos.append(lanc)
     return lancamentos
 
 # ============================================================
-# 🔹 Verificação de duplicidade (exata)
+# 🔹 Verificação de duplicidade (exata: data + valor + historico)
 # ============================================================
 def existe_lancamento(lanc):
     query = """
         SELECT COUNT(*) FROM lancamentos
-        WHERE data = %s AND valor = %s AND historico = %s AND fitid = %s
+        WHERE data = %s AND valor = %s AND historico = %s
     """
     resultado = executar_query(query, (
         lanc["data"],
         float(lanc["valor"]) if lanc["valor"] is not None else None,
-        lanc["historico"],
-        lanc["fitid"]
+        lanc["historico"]
     ), fetch=True)
     return resultado[0][0] > 0
 
@@ -101,17 +94,15 @@ def existe_lancamento(lanc):
 # ============================================================
 def salvar_lancamento(lanc):
     query = """
-        INSERT INTO lancamentos (data, valor, historico, banco, arquivo_origem, fitid, checknum)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO lancamentos (data, valor, historico, banco, arquivo_origem)
+        VALUES (%s, %s, %s, %s, %s)
     """
     executar_query(query, (
         lanc["data"],
         float(lanc["valor"]) if lanc["valor"] is not None else None,
         lanc["historico"],
         lanc["banco"],
-        lanc["arquivo_origem"],
-        lanc["fitid"],
-        lanc["checknum"]
+        lanc["arquivo_origem"]
     ))
 
 # ============================================================
