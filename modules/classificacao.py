@@ -9,10 +9,10 @@
 
 import streamlit as st
 import pandas as pd
-from modules.database import conectar
+from modules.database import conectar, executar_query
 
 # ============================================================
-# 🔹 SALVAR LANÇAMENTOS NO BANCO (EVITANDO DUPLICIDADE)
+# 🔹 SALVAR UM LANÇAMENTO NO BANCO (EVITANDO DUPLICIDADE)
 # ============================================================
 def salvar_lancamento(lanc):
     query = """
@@ -31,19 +31,18 @@ def salvar_lancamento(lanc):
         lanc["assinatura"]
     ))
 
-            if cur.rowcount > 0:
-                inseridos += 1
-            else:
-                ignorados += 1
-
+# ============================================================
+# 🔹 SALVAR VÁRIOS LANÇAMENTOS (CONTROLE DE INSERIDOS/IGNORADOS)
+# ============================================================
+def salvar_lancamentos(lancamentos):
+    inseridos, ignorados = 0, 0
+    for lanc in lancamentos:
+        try:
+            salvar_lancamento(lanc)
+            inseridos += 1
         except Exception as e:
             st.error(f"ERRO AO INSERIR: {e}")
             ignorados += 1
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
     return inseridos, ignorados
 
 # ============================================================
