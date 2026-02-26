@@ -3,10 +3,16 @@ import io
 from ofxparse import OfxParser
 from modules.database import executar_query
 
+# ============================================================
+# 🔹 Geração de assinatura única para cada lançamento
+# ============================================================
 def gerar_assinatura(lanc):
     base = f"{lanc['data']}{lanc['valor']}{lanc['historico']}{lanc['banco']}"
     return hashlib.sha1(base.encode("utf-8")).hexdigest()
 
+# ============================================================
+# 🔹 Leitura do arquivo OFX
+# ============================================================
 def ler_ofx(arquivo):
     try:
         return _parse_ofx(arquivo)
@@ -26,6 +32,9 @@ def _parse_ofx(arquivo):
     ofx = OfxParser.parse(arquivo)
     return _extrair_lancamentos(ofx, arquivo)
 
+# ============================================================
+# 🔹 Extração dos lançamentos do OFX
+# ============================================================
 def _extrair_lancamentos(ofx, arquivo):
     lancamentos = []
     caminhos = [
@@ -64,15 +73,29 @@ def _extrair_lancamentos(ofx, arquivo):
 
     return lancamentos
 
+# ============================================================
+# 🔹 Verificação de duplicidade
+# ============================================================
 def existe_lancamento(lanc):
+    # Verifica por fitid + banco + arquivo
     query = """
         SELECT COUNT(*) FROM lancamentos
-        WHERE fitid = %s AND checknum = %s AND banco = %s AND arquivo_origem = %s
+        WHERE fitid = %s AND banco = %s AND arquivo_origem = %s
     """
-    resultado = executar_query(query, (lanc["fitid"], lanc["checknum"], lanc["banco"], lanc["arquivo_origem"]), fetch=True)
+    resultado = executar_query(query, (lanc["fitid"], lanc["banco"], lanc["arquivo_origem"]), fetch=True)
     if resultado[0][0] > 0:
         return True
 
+    # Verifica por checknum + banco + valor + data
+    query = """
+        SELECT COUNT(*) FROM lancamentos
+        WHERE checknum = %s AND banco = %s AND valor = %s AND data = %s
+    """
+    resultado = executar_query(query, (lanc["checknum"], lanc["banco"], lanc["valor"], lanc["data"]), fetch=True)
+    if resultado[0][0] > 0:
+        return True
+
+    # Verifica por assinatura + banco
     query = """
         SELECT COUNT(*) FROM lancamentos
         WHERE assinatura = %s AND banco = %s
@@ -80,29 +103,25 @@ def existe_lancamento(lanc):
     resultado = executar_query(query, (lanc["assinatura"], lanc["banco"]), fetch=True)
     return resultado[0][0] > 0
 
-def arquivo_ja_importado(lancamentos):
-    for lanc in lancamentos:
-        if not existe_lancamento(lanc):
-            return False
-    return True
-
+# ============================================================
+# 🔹 Inserção de lançamento (ignora duplicados)
+# ============================================================
 def salvar_lancamento(lanc):
     query = """
         INSERT INTO lancamentos (data, valor, historico, banco, arquivo_origem, fitid, checknum, assinatura)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (fitid, banco, arquivo_origem) DO NOTHING
     """
     executar_query(query, (
         lanc["data"], lanc["valor"], lanc["historico"], lanc["banco"],
         lanc["arquivo_origem"], lanc["fitid"], lanc["checknum"], lanc["assinatura"]
     ))
 
+# ============================================================
+# 🔹 Importação do arquivo OFX
+# ============================================================
 def importar_ofx(arquivo):
     lancamentos = ler_ofx(arquivo)
-
-    if arquivo_ja_importado(lancamentos):
-        print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} já foi importado, ignorando...")
-        return 0, len(lancamentos)
 
     inseridos, ignorados = 0, 0
     for lanc in lancamentos:
@@ -112,4 +131,5 @@ def importar_ofx(arquivo):
         else:
             ignorados += 1
 
+    print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
