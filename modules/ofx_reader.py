@@ -26,7 +26,7 @@ def ler_ofx_itau(texto, arquivo):
         lanc = {
             "historico": memo.group(1).strip() if memo else None,
             "valor": float(valor.group(1)) if valor else 0.0,
-            "data": data_valor,
+            "data": str(data_valor) if data_valor else None,
             "banco": "ITAÚ",
             "arquivo_origem": getattr(arquivo, "name", "OFX_ITAU"),
         }
@@ -65,7 +65,7 @@ def _extrair_lancamentos(ofx, arquivo):
 
     for t in transacoes:
         lanc = {
-            "data": t.date.date() if hasattr(t.date, "date") else t.date,
+            "data": str(t.date.date()) if hasattr(t.date, "date") else str(t.date),
             "valor": float(t.amount),
             "historico": t.memo,
             "banco": getattr(ofx.account.institution, "organization", "BANCO_DESCONHECIDO"),
@@ -75,9 +75,19 @@ def _extrair_lancamentos(ofx, arquivo):
     return lancamentos
 
 # ============================================================
-# 🔹 Verificação de duplicidade (exata: data + valor + historico)
+# 🔹 Verificação de duplicidade (data + valor + historico)
 # ============================================================
-
+def existe_lancamento(lanc):
+    query = """
+        SELECT COUNT(*) FROM lancamentos
+        WHERE data = %s AND valor = %s AND historico = %s
+    """
+    resultado = executar_query(query, (
+        lanc["data"],
+        float(lanc["valor"]) if lanc["valor"] is not None else None,
+        lanc["historico"]
+    ), fetch=True)
+    return resultado and resultado[0][0] > 0
 
 # ============================================================
 # 🔹 Inserção de lançamento
@@ -86,6 +96,7 @@ def salvar_lancamento(lanc):
     query = """
         INSERT INTO lancamentos (data, valor, historico, banco, arquivo_origem)
         VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (data, valor, historico) DO NOTHING
     """
     executar_query(query, (
         lanc["data"],
@@ -109,4 +120,3 @@ def importar_ofx(arquivo):
             ignorados += 1
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
-
