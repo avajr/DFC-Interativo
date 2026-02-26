@@ -88,12 +88,9 @@ def importar_ofx(arquivo):
     lancamentos = ler_ofx(arquivo)
     inseridos, ignorados = 0, 0
     for lanc in lancamentos:
-        if not existe_lancamento(lanc):
-            salvar_lancamento(lanc)
-            inseridos += 1
-        else:
-            ignorados += 1
+
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
