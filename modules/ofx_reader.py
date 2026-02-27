@@ -104,42 +104,48 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 def ler_ofx_santander(texto, arquivo):
     lancamentos = []
-    # Regex mais tolerante
-    transacoes = re.findall(r"<STMTTRN>([\s\S]*?)</STMTTRN>", texto, re.IGNORECASE)
+    linhas = texto.splitlines()
+    bloco = []
+    dentro = False
 
-    print("[DEBUG] Santander - blocos encontrados:", len(transacoes))
-    if transacoes:
-        print("[DEBUG] Primeiro bloco:\n", transacoes[0][:500])  # mostra os primeiros 500 caracteres
+    for linha in linhas:
+        if "<STMTTRN>" in linha:
+            dentro = True
+            bloco = []
+        elif "</STMTTRN>" in linha:
+            dentro = False
+            trn = "\n".join(bloco)
 
-    for trn in transacoes:
-        memo = re.search(r"<MEMO>([^<]*)", trn)
-        valor = re.search(r"<TRNAMT>([^<]*)", trn)
-        data = re.search(r"<DTPOSTED>([^<]*)", trn)
+            memo = re.search(r"<MEMO>([^<]*)", trn)
+            valor = re.search(r"<TRNAMT>([^<]*)", trn)
+            data = re.search(r"<DTPOSTED>([^<]*)", trn)
 
-        data_valor = None
-        if data:
-            raw = data.group(1).strip()
-            try:
-                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-            except Exception:
-                data_valor = None
+            data_valor = None
+            if data:
+                raw = data.group(1).strip()
+                try:
+                    data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
+                except Exception:
+                    data_valor = None
 
-        valor_num = 0.0
-        if valor:
-            raw_valor = valor.group(1).strip().replace(",", ".")
-            try:
-                valor_num = float(raw_valor)
-            except Exception:
-                valor_num = 0.0
+            valor_num = 0.0
+            if valor:
+                raw_valor = valor.group(1).strip().replace(",", ".")
+                try:
+                    valor_num = float(raw_valor)
+                except Exception:
+                    valor_num = 0.0
 
-        lanc = {
-            "historico": memo.group(1).strip() if memo else None,
-            "valor": valor_num,
-            "data": str(data_valor) if data_valor else None,
-            "banco": "SANTANDER",
-            "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
-        }
-        lancamentos.append(lanc)
+            lanc = {
+                "historico": memo.group(1).strip() if memo else None,
+                "valor": valor_num,
+                "data": str(data_valor) if data_valor else None,
+                "banco": "SANTANDER",
+                "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
+            }
+            lancamentos.append(lanc)
+        elif dentro:
+            bloco.append(linha)
 
     return lancamentos
 
@@ -276,6 +282,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
