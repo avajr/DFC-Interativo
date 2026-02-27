@@ -147,7 +147,9 @@ def ler_ofx_santander(texto, arquivo):
         elif dentro:
             bloco.append(linha)
 
+    print("[DEBUG] Santander - lançamentos encontrados:", len(lancamentos))
     return lancamentos
+
 
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
@@ -282,6 +284,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
