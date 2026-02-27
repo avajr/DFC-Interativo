@@ -108,9 +108,9 @@ def ler_ofx_santander(texto, arquivo):
     transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL | re.IGNORECASE)
 
     for trn in transacoes:
-        memo = re.search(r"<MEMO>(.*?)</MEMO>", trn, re.DOTALL)
-        valor = re.search(r"<TRNAMT>(.*?)</TRNAMT>", trn, re.DOTALL)
-        data = re.search(r"<DTPOSTED>(.*?)</DTPOSTED>", trn, re.DOTALL)
+        memo = re.search(r"<MEMO>(.*?)\n", trn)
+        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
+        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
 
         # Converte data
         data_valor = None
@@ -140,7 +140,6 @@ def ler_ofx_santander(texto, arquivo):
         lancamentos.append(lanc)
 
     return lancamentos
-
 
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
@@ -275,5 +274,6 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
