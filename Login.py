@@ -9,7 +9,7 @@ st.title("🔐 Login DFC")
 st.set_page_config(
     page_title="🔑 Login DFC Interativo",
     page_icon="🔐",   # ícone
-    layout="wide"
+    layout="centered"
 )
 
 def get_connection():
@@ -107,6 +107,7 @@ elif acao == "Cadastrar novo usuário":
             cadastrar_usuario(novo_login, nova_senha)
         else:
             st.warning("Preencha usuário e senha para cadastrar!")
+
 
 
 
