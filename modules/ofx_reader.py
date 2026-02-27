@@ -104,16 +104,13 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 def ler_ofx_santander(texto, arquivo):
     lancamentos = []
-    # Captura cada bloco de transação
     transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL | re.IGNORECASE)
 
     for trn in transacoes:
-        # Captura até o próximo "<"
-        memo = re.search(r"<MEMO>([^<]*)", trn)
-        valor = re.search(r"<TRNAMT>([^<]*)", trn)
-        data = re.search(r"<DTPOSTED>([^<]*)", trn)
+        memo = re.search(r"<MEMO>(.*?)</MEMO>", trn, re.DOTALL)
+        valor = re.search(r"<TRNAMT>(.*?)</TRNAMT>", trn, re.DOTALL)
+        data = re.search(r"<DTPOSTED>(.*?)</DTPOSTED>", trn, re.DOTALL)
 
-        # Converte data
         data_valor = None
         if data:
             raw = data.group(1).strip()
@@ -122,18 +119,9 @@ def ler_ofx_santander(texto, arquivo):
             except Exception:
                 data_valor = None
 
-        # Converte valor (vírgula para ponto)
-        valor_num = 0.0
-        if valor:
-            raw_valor = valor.group(1).strip().replace(",", ".")
-            try:
-                valor_num = float(raw_valor)
-            except Exception:
-                valor_num = 0.0
-
         lanc = {
             "historico": memo.group(1).strip() if memo else None,
-            "valor": valor_num,
+            "valor": float(valor.group(1)) if valor else 0.0,
             "data": str(data_valor) if data_valor else None,
             "banco": "SANTANDER",
             "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
@@ -141,6 +129,7 @@ def ler_ofx_santander(texto, arquivo):
         lancamentos.append(lanc)
 
     return lancamentos
+
 
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
@@ -275,6 +264,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
