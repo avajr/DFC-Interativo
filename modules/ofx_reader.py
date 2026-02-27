@@ -104,13 +104,12 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 def ler_ofx_santander(texto, arquivo):
     lancamentos = []
-    # Captura cada bloco de transação
     transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL | re.IGNORECASE)
 
     for trn in transacoes:
-        memo = re.search(r"<MEMO>(.*?)\n", trn)
-        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
-        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
+        memo = re.search(r"\s*<MEMO>([^<]*)", trn)
+        valor = re.search(r"\s*<TRNAMT>([^<]*)", trn)
+        data = re.search(r"\s*<DTPOSTED>([^<]*)", trn)
 
         # Converte data
         data_valor = None
@@ -265,6 +264,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
