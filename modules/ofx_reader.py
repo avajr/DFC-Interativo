@@ -73,12 +73,12 @@ def ler_ofx_bb(texto, arquivo):
 # ============================================================
 def ler_ofx_sicredi(texto, arquivo):
     lancamentos = []
-    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL)
+    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL | re.IGNORECASE)
 
     for trn in transacoes:
-        memo = re.search(r"<MEMO>(.*?)\n", trn)
-        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
-        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
+        memo = re.search(r"<MEMO>(.*?)</MEMO>", trn, re.DOTALL)
+        valor = re.search(r"<TRNAMT>(.*?)</TRNAMT>", trn, re.DOTALL)
+        data = re.search(r"<DTPOSTED>(.*?)</DTPOSTED>", trn, re.DOTALL)
 
         data_valor = None
         if data:
@@ -245,3 +245,4 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
