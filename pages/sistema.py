@@ -537,7 +537,6 @@ else:
 
             # 🔹 Aplicar formatação de data e valor
             df_page["data"] = df_page["data"].apply(data_br)
-            df_page["valor"] = df_page["valor"].apply(moeda)
    
             # Torna a matriz editável
             edited_df = st.data_editor(
