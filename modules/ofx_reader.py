@@ -59,8 +59,13 @@ def ler_ofx(arquivo):
 
             # Detecta OFX SGML (Itaú)
             if "OFXHEADER" in text and "DATA:OFXSGML" in text:
-                print("[DEBUG] Detectado arquivo SGML (Itaú). Usando parser manual.")
-                return ler_ofx_itau(text, arquivo)
+                # Detecta Itaú ou Sicredi
+                if "ITAÚ" in text or "ITAU" in text:
+                    print("[DEBUG] Detectado arquivo SGML (Itaú). Usando parser manual.")
+                    return ler_ofx_itau(text, arquivo)
+                else:
+                    print("[DEBUG] Detectado arquivo SGML (Sicredi). Usando parser manual.")
+                    return ler_ofx_sicredi(text, arquivo)
 
             # Outros bancos
             ofx = OfxParser.parse(io.StringIO(text))
@@ -72,6 +77,37 @@ def ler_ofx(arquivo):
 
     print("[DEBUG] Não foi possível decodificar o arquivo.")
     return []
+
+# ============================================================
+# 🔹 Parser manual para Sicredi (OFX SGML)
+# ============================================================
+def ler_ofx_sicredi(texto, arquivo):
+    lancamentos = []
+    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL)
+
+    for trn in transacoes:
+        memo = re.search(r"<MEMO>(.*?)\n", trn)
+        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
+        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
+
+        data_valor = None
+        if data:
+            raw = data.group(1).strip()
+            try:
+                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
+            except Exception:
+                data_valor = None
+
+        lanc = {
+            "historico": memo.group(1).strip() if memo else None,
+            "valor": float(valor.group(1)) if valor else 0.0,
+            "data": str(data_valor) if data_valor else None,
+            "banco": "SICREDI",
+            "arquivo_origem": getattr(arquivo, "name", "OFX_SICREDI"),
+        }
+        lancamentos.append(lanc)
+
+    return lancamentos
 
 
 # ============================================================
@@ -169,4 +205,5 @@ def importar_ofx(arquivo):
     )
 
     return inseridos, ignorados
+
 
