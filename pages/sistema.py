@@ -13,7 +13,7 @@ import pandas as pd
 import streamlit as st
 from io import BytesIO
 import pandas as pd
-
+from modules.formatacao import data_br, moeda, percentual
 from modules.database import importar_contas_excel, criar_tabelas
 from modules.contas import (
     carregar_contas,
@@ -468,7 +468,7 @@ else:
         # 📄 LANÇAMENTOS IMPORTADOS
         # ============================================================
         st.markdown("### 📄 Lançamentos Importados")
-
+        
         if df_lanc.empty:
             st.info("Nenhum lançamento importado ainda.")
         else:
@@ -535,6 +535,10 @@ else:
             # Selecionar apenas as colunas desejadas
             df_page = df_page[["id", "data", "valor", "historico", "conta_registro", "nome_registro"]]
 
+            # 🔹 Aplicar formatação de data e valor
+            df_page["data"] = df_page["data"].apply(data_br)
+            df_page["valor"] = df_page["valor"].apply(moeda)
+   
             # Torna a matriz editável
             edited_df = st.data_editor(
                 df_page,
