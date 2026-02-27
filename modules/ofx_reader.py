@@ -104,17 +104,18 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 def ler_ofx_santander(texto, arquivo):
     lancamentos = []
-    # Captura blocos mesmo com indentação
-    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL | re.IGNORECASE)
+    # Regex mais tolerante
+    transacoes = re.findall(r"<STMTTRN>([\s\S]*?)</STMTTRN>", texto, re.IGNORECASE)
 
-    print("[DEBUG] Santander - blocos encontrados:", len(transacoes))  # debug
+    print("[DEBUG] Santander - blocos encontrados:", len(transacoes))
+    if transacoes:
+        print("[DEBUG] Primeiro bloco:\n", transacoes[0][:500])  # mostra os primeiros 500 caracteres
 
     for trn in transacoes:
         memo = re.search(r"<MEMO>([^<]*)", trn)
         valor = re.search(r"<TRNAMT>([^<]*)", trn)
         data = re.search(r"<DTPOSTED>([^<]*)", trn)
 
-        # Converte data
         data_valor = None
         if data:
             raw = data.group(1).strip()
@@ -123,7 +124,6 @@ def ler_ofx_santander(texto, arquivo):
             except Exception:
                 data_valor = None
 
-        # Converte valor (vírgula para ponto)
         valor_num = 0.0
         if valor:
             raw_valor = valor.group(1).strip().replace(",", ".")
@@ -276,6 +276,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
