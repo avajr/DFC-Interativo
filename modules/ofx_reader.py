@@ -4,7 +4,6 @@ from ofxparse import OfxParser
 from modules.database import executar_query
 from datetime import datetime
 
-
 # ============================================================
 # 🔹 Parser manual para Itaú (OFX SGML)
 # ============================================================
@@ -32,54 +31,45 @@ def ler_ofx_itau(texto, arquivo):
             "banco": "ITAÚ",
             "arquivo_origem": getattr(arquivo, "name", "OFX_ITAU"),
         }
-
         lancamentos.append(lanc)
 
     return lancamentos
 
 
 # ============================================================
-# 🔹 Leitura do arquivo OFX (detecta Itaú vs outros bancos)
+# 🔹 Parser manual para Banco do Brasil (OFX SGML)
 # ============================================================
-def ler_ofx(arquivo):
-    # 🔥 RESETA O PONTEIRO ANTES DE LER
-    arquivo.seek(0)
+def ler_ofx_bb(texto, arquivo):
+    lancamentos = []
+    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL)
 
-    content = arquivo.read()
+    for trn in transacoes:
+        memo = re.search(r"<MEMO>(.*?)\n", trn)
+        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
+        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
 
-    if not content:
-        print("[DEBUG] Arquivo vazio ao tentar ler.")
-        return []
+        data_valor = None
+        if data:
+            raw = data.group(1).strip()
+            try:
+                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
+            except Exception:
+                data_valor = None
 
-    encodings = ["utf-8", "latin-1", "cp1252"]
+        lanc = {
+            "historico": memo.group(1).strip() if memo else None,
+            "valor": float(valor.group(1)) if valor else 0.0,
+            "data": str(data_valor) if data_valor else None,
+            "banco": "BANCO DO BRASIL",
+            "arquivo_origem": getattr(arquivo, "name", "OFX_BB"),
+        }
+        lancamentos.append(lanc)
 
-    for enc in encodings:
-        try:
-            text = content.decode(enc)
+    return lancamentos
 
-            # Detecta OFX SGML (Itaú)
-            if "OFXHEADER" in text and "DATA:OFXSGML" in text:
-                # Detecta Itaú ou Sicredi
-                if "ITAÚ" in text or "ITAU" in text:
-                    print("[DEBUG] Detectado arquivo SGML (Itaú). Usando parser manual.")
-                    return ler_ofx_itau(text, arquivo)
-                else:
-                    print("[DEBUG] Detectado arquivo SGML (Sicredi). Usando parser manual.")
-                    return ler_ofx_sicredi(text, arquivo)
-
-            # Outros bancos
-            ofx = OfxParser.parse(io.StringIO(text))
-            return _extrair_lancamentos(ofx, arquivo)
-
-        except Exception as e:
-            print(f"[DEBUG] Falha ao parsear com encoding {enc}: {e}")
-            continue
-
-    print("[DEBUG] Não foi possível decodificar o arquivo.")
-    return []
 
 # ============================================================
-# 🔹 Parser manual para Sicredi (OFX SGML)
+# 🔹 Parser manual para Sicredi (OFX SGML) — ainda não funcional
 # ============================================================
 def ler_ofx_sicredi(texto, arquivo):
     lancamentos = []
@@ -111,13 +101,35 @@ def ler_ofx_sicredi(texto, arquivo):
 
 
 # ============================================================
-# 🔹 Extração dos lançamentos do OFX (Santander, BB, Sicredi)
+# 🔹 Parser manual para Santander (OFX SGML/XML)
+# ============================================================
+def ler_ofx_santander(texto, arquivo):
+    try:
+        ofx = OfxParser.parse(io.StringIO(texto))
+        return _extrair_lancamentos(ofx, arquivo)
+    except Exception as e:
+        print(f"[DEBUG] Falha no parser Santander: {e}")
+        return []
+
+
+# ============================================================
+# 🔹 Parser universal (usa OfxParser)
+# ============================================================
+def ler_ofx_universal(texto, arquivo):
+    try:
+        ofx = OfxParser.parse(io.StringIO(texto))
+        return _extrair_lancamentos(ofx, arquivo)
+    except Exception as e:
+        print(f"[DEBUG] Falha no parser universal: {e}")
+        return []
+
+
+# ============================================================
+# 🔹 Extração dos lançamentos do OFX (genérico)
 # ============================================================
 def _extrair_lancamentos(ofx, arquivo):
     lancamentos = []
-
-    transacoes = getattr(ofx, "transactions", None) or \
-                 getattr(ofx.account, "transactions", None)
+    transacoes = getattr(ofx, "transactions", None) or getattr(ofx.account, "transactions", None)
 
     if not transacoes:
         print("[DEBUG] Nenhuma lista de transações encontrada.")
@@ -131,10 +143,49 @@ def _extrair_lancamentos(ofx, arquivo):
             "banco": getattr(ofx.account.institution, "organization", "BANCO_DESCONHECIDO"),
             "arquivo_origem": getattr(arquivo, "name", "OFX_DESCONHECIDO"),
         }
-
         lancamentos.append(lanc)
 
     return lancamentos
+
+
+# ============================================================
+# 🔹 Leitura do arquivo OFX (roteador de parsers)
+# ============================================================
+def ler_ofx(arquivo):
+    arquivo.seek(0)
+    content = arquivo.read()
+    if not content:
+        print("[DEBUG] Arquivo vazio ao tentar ler.")
+        return []
+
+    encodings = ["utf-8", "latin-1", "cp1252"]
+
+    for enc in encodings:
+        try:
+            text = content.decode(enc)
+
+            if "OFXHEADER" in text and "DATA:OFXSGML" in text:
+                if "ITAÚ" in text or "ITAU" in text:
+                    return ler_ofx_itau(text, arquivo)
+                elif "BANCO DO BRASIL" in text or "BB" in text:
+                    return ler_ofx_bb(text, arquivo)
+                elif "SICREDI" in text or "COOP DE CRED" in text:
+                    return ler_ofx_sicredi(text, arquivo)
+                elif "SANTANDER" in text:
+                    return ler_ofx_santander(text, arquivo)
+                else:
+                    print("[DEBUG] SGML não identificado, usando parser universal.")
+                    return ler_ofx_universal(text, arquivo)
+
+            # Se não for SGML, usa universal direto
+            return ler_ofx_universal(text, arquivo)
+
+        except Exception as e:
+            print(f"[DEBUG] Falha ao parsear com encoding {enc}: {e}")
+            continue
+
+    print("[DEBUG] Não foi possível decodificar o arquivo.")
+    return []
 
 
 # ============================================================
@@ -145,17 +196,11 @@ def existe_lancamento(lanc):
         SELECT COUNT(*) FROM lancamentos
         WHERE data = %s AND valor = %s AND historico = %s
     """
-
     resultado = executar_query(
         query,
-        (
-            lanc["data"],
-            float(lanc["valor"]) if lanc["valor"] is not None else None,
-            lanc["historico"]
-        ),
+        (lanc["data"], float(lanc["valor"]) if lanc["valor"] is not None else None, lanc["historico"]),
         fetch=True
     )
-
     return resultado and resultado[0][0] > 0
 
 
@@ -169,20 +214,19 @@ def salvar_lancamento(lanc):
         ON CONFLICT (data, valor, historico) DO NOTHING
     """
     executar_query(query, (
-        str(lanc["data"]),  # força string no formato YYYY-MM-DD
+        str(lanc["data"]),
         float(lanc["valor"]) if lanc["valor"] is not None else None,
         lanc["historico"],
         lanc["banco"],
         lanc["arquivo_origem"]
     ))
 
+
 # ============================================================
 # 🔹 Importação do arquivo OFX
 # ============================================================
 def importar_ofx(arquivo):
-    # 🔥 IMPORTANTE: reset antes de ler novamente
     arquivo.seek(0)
-
     lancamentos = ler_ofx(arquivo)
 
     if not lancamentos:
@@ -199,11 +243,5 @@ def importar_ofx(arquivo):
         else:
             ignorados += 1
 
-    print(
-        f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: "
-        f"{inseridos} novos, {ignorados} ignorados."
-    )
-
+    print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
-
-
