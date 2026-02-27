@@ -69,7 +69,7 @@ def ler_ofx_bb(texto, arquivo):
 
 
 # ============================================================
-# 🔹 Parser manual para Sicredi (OFX SGML) — ainda não funcional
+# 🔹 Parser manual para Sicredi (OFX SGML)
 # ============================================================
 def ler_ofx_sicredi(texto, arquivo):
     lancamentos = []
@@ -101,15 +101,45 @@ def ler_ofx_sicredi(texto, arquivo):
 
 
 # ============================================================
-# 🔹 Parser manual para Santander (OFX SGML/XML)
+# 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
 def ler_ofx_santander(texto, arquivo):
-    try:
-        ofx = OfxParser.parse(io.StringIO(texto))
-        return _extrair_lancamentos(ofx, arquivo)
-    except Exception as e:
-        print(f"[DEBUG] Falha no parser Santander: {e}")
-        return []
+    lancamentos = []
+    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL | re.IGNORECASE)
+
+    for trn in transacoes:
+        memo = re.search(r"<MEMO>(.*?)</MEMO>", trn, re.DOTALL)
+        valor = re.search(r"<TRNAMT>(.*?)</TRNAMT>", trn, re.DOTALL)
+        data = re.search(r"<DTPOSTED>(.*?)</DTPOSTED>", trn, re.DOTALL)
+
+        # Converte data
+        data_valor = None
+        if data:
+            raw = data.group(1).strip()
+            try:
+                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
+            except Exception:
+                data_valor = None
+
+        # Converte valor (vírgula para ponto)
+        valor_num = 0.0
+        if valor:
+            raw_valor = valor.group(1).strip().replace(",", ".")
+            try:
+                valor_num = float(raw_valor)
+            except Exception:
+                valor_num = 0.0
+
+        lanc = {
+            "historico": memo.group(1).strip() if memo else None,
+            "valor": valor_num,
+            "data": str(data_valor) if data_valor else None,
+            "banco": "SANTANDER",
+            "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
+        }
+        lancamentos.append(lanc)
+
+    return lancamentos
 
 
 # ============================================================
@@ -245,4 +275,5 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
