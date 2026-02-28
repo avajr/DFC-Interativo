@@ -102,68 +102,14 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
-import re
-from datetime import datetime
+from ofxparse import OfxParser
 
-def ler_ofx_santander(caminho_arquivo):
-    lancamentos = []
+with open("santander.ofx", "r", encoding="latin-1") as f:
+    ofx = OfxParser.parse(f)
 
-    # 🔹 Leia o arquivo com a codificação correta (Windows-1252 / Latin-1)
-    with open(caminho_arquivo, "r", encoding="latin-1") as f:
-        linhas = f.read().replace("\r\n", "\n").replace("\r", "\n").splitlines()
+for transaction in ofx.account.statement.transactions:
+    print(transaction.date, transaction.amount, transaction.memo)
 
-    bloco = []
-    dentro = False
-
-    for linha in linhas:
-        # Início de transação
-        if "<STMTTRN>" in linha:
-            dentro = True
-            bloco = []
-        # Fim de transação (aceita espaços depois da tag)
-        elif "</STMTTRN" in linha:
-            dentro = False
-            trn = "\n".join(bloco)
-
-            # Extrai campos
-            memo = re.search(r"<MEMO>([^<]*)", trn)
-            valor = re.search(r"<TRNAMT>([^<]*)", trn)
-            data = re.search(r"<DTPOSTED>([^<]*)", trn)
-
-            # Converte data
-            data_valor = None
-            if data:
-                raw = data.group(1).strip()
-                try:
-                    data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-                except Exception:
-                    data_valor = None
-
-            # Converte valor (vírgula para ponto)
-            valor_num = 0.0
-            if valor:
-                raw_valor = valor.group(1).strip().replace(",", ".")
-                try:
-                    valor_num = float(raw_valor)
-                except Exception:
-                    valor_num = 0.0
-
-            lanc = {
-                "historico": memo.group(1).strip() if memo else None,
-                "valor": valor_num,
-                "data": str(data_valor) if data_valor else None,
-                "banco": "SANTANDER",
-                "arquivo_origem": caminho_arquivo,
-            }
-            lancamentos.append(lanc)
-        # Linha dentro do bloco
-        elif dentro:
-            bloco.append(linha)
-
-    print("[DEBUG] Santander - lançamentos extraídos:", len(lancamentos))
-    if lancamentos:
-        print("[DEBUG] Primeiro lançamento:", lancamentos[0])
-    return lancamentos
     
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
@@ -291,6 +237,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
