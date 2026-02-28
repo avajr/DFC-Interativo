@@ -102,14 +102,22 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
-from ofxparse import OfxParser
+def ler_ofx_santander(texto, arquivo):
+    # Usa OfxParser para interpretar o texto
+    ofx = OfxParser.parse(io.StringIO(texto))
 
-with open("santander.ofx", "r", encoding="latin-1") as f:
-    ofx = OfxParser.parse(f)
+    lancamentos = []
+    for transaction in ofx.account.statement.transactions:
+        lanc = {
+            "data": str(transaction.date.date()) if hasattr(transaction.date, "date") else str(transaction.date),
+            "valor": float(transaction.amount),
+            "historico": transaction.memo,
+            "banco": "SANTANDER",
+            "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
+        }
+        lancamentos.append(lanc)
 
-for transaction in ofx.account.statement.transactions:
-    print(transaction.date, transaction.amount, transaction.memo)
-
+    return lancamentos
     
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
@@ -237,6 +245,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
