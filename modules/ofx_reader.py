@@ -105,20 +105,26 @@ def ler_ofx_sicredi(texto, arquivo):
 import re
 from datetime import datetime
 
+def ler_ofx_santander(arquivo):
 
-def ler_ofx_santander(caminho_arquivo):
+    # Se for Streamlit UploadedFile
+    if hasattr(arquivo, "read"):
+        arquivo.seek(0)
+        conteudo = arquivo.read().decode("cp1252", errors="ignore")
+    else:
+        with open(arquivo, "r", encoding="cp1252", errors="ignore") as f:
+            conteudo = f.read()
+
     lancamentos = []
 
-    with open(caminho_arquivo, "r", encoding="latin-1") as f:
-        conteudo = f.read()
+    # 🔥 Divide por <STMTTRN> ao invés de depender do fechamento
+    blocos = conteudo.split("<STMTTRN>")
 
-    # 🔥 Extrai todos blocos STMTTRN de uma vez
-    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", conteudo, re.DOTALL | re.IGNORECASE)
+    for bloco in blocos[1:]:  # ignora o primeiro pedaço antes do primeiro STMTTRN
 
-    for trn in transacoes:
-        memo = re.search(r"<MEMO>([^<]*)", trn, re.IGNORECASE)
-        valor = re.search(r"<TRNAMT>([^<]*)", trn, re.IGNORECASE)
-        data = re.search(r"<DTPOSTED>([^<]*)", trn, re.IGNORECASE)
+        memo = re.search(r"<MEMO>(.*)", bloco)
+        valor = re.search(r"<TRNAMT>(.*)", bloco)
+        data = re.search(r"<DTPOSTED>(.*)", bloco)
 
         # Data
         data_valor = None
@@ -126,7 +132,7 @@ def ler_ofx_santander(caminho_arquivo):
             raw = data.group(1).strip()
             try:
                 data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-            except Exception:
+            except:
                 data_valor = None
 
         # Valor
@@ -135,25 +141,21 @@ def ler_ofx_santander(caminho_arquivo):
             raw_valor = valor.group(1).strip().replace(",", ".")
             try:
                 valor_num = float(raw_valor)
-            except Exception:
+            except:
                 valor_num = 0.0
 
-        lanc = {
+        lancamentos.append({
             "historico": memo.group(1).strip() if memo else None,
             "valor": valor_num,
             "data": str(data_valor) if data_valor else None,
             "banco": "SANTANDER",
-            "arquivo_origem": caminho_arquivo,
-        }
+            "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
+        })
 
-        lancamentos.append(lanc)
-
-    print("[DEBUG] Santander - lançamentos extraídos:", len(lancamentos))
-    if lancamentos:
-        print("[DEBUG] Primeiro lançamento:", lancamentos[0])
+    print("DEBUG - blocos encontrados:", len(blocos) - 1)
+    print("DEBUG - lançamentos extraídos:", len(lancamentos))
 
     return lancamentos
-
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
 # ============================================================
@@ -287,6 +289,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
