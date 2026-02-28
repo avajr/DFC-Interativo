@@ -102,8 +102,16 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
-blocos = []
-bloco = []
+blocos = for trn in blocos:
+    memo = re.search(r"<MEMO>([^<]*)", trn)
+    valor = re.search(r"<TRNAMT>([^<]*)", trn)
+    data = re.search(r"<DTPOSTED>([^<]*)", trn)
+    print(memo, valor, data)
+bloco = for trn in blocos:
+    memo = re.search(r"<MEMO>([^<]*)", trn)
+    valor = re.search(r"<TRNAMT>([^<]*)", trn)
+    data = re.search(r"<DTPOSTED>([^<]*)", trn)
+    print(memo, valor, data)
 dentro = False
 
 for linha in texto.splitlines():
@@ -251,6 +259,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
