@@ -102,19 +102,38 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
-import io
-from ofxparse import OfxParser
+import re
+from datetime import datetime
 
 def ler_ofx_santander(texto, arquivo):
-    # Usa OfxParser para interpretar o texto
-    ofx = OfxParser.parse(io.StringIO(texto))
-
     lancamentos = []
-    for transaction in ofx.account.statement.transactions:
+    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL | re.IGNORECASE)
+
+    for trn in transacoes:
+        memo = re.search(r"<MEMO>([^\n\r]*)", trn)
+        valor = re.search(r"<TRNAMT>([^\n\r]*)", trn)
+        data = re.search(r"<DTPOSTED>([^\n\r]*)", trn)
+
+        data_valor = None
+        if data:
+            raw = data.group(1).strip()
+            try:
+                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
+            except Exception:
+                data_valor = None
+
+        valor_num = 0.0
+        if valor:
+            raw_valor = valor.group(1).strip().replace(",", ".")
+            try:
+                valor_num = float(raw_valor)
+            except Exception:
+                valor_num = 0.0
+
         lanc = {
-            "data": str(transaction.date.date()) if hasattr(transaction.date, "date") else str(transaction.date),
-            "valor": float(transaction.amount),
-            "historico": transaction.memo,
+            "historico": memo.group(1).strip() if memo else None,
+            "valor": valor_num,
+            "data": str(data_valor) if data_valor else None,
             "banco": "SANTANDER",
             "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
         }
@@ -248,6 +267,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
