@@ -112,17 +112,17 @@ def ler_ofx_santander(caminho_arquivo):
     with open(caminho_arquivo, "r", encoding="latin-1") as f:
         texto = f.read()
 
-    # Normaliza quebras de linha
+    # Normaliza e limpa caracteres invisíveis
     texto = texto.replace("\r\n", "\n").replace("\r", "\n")
+    texto = re.sub(r"[\x00-\x1F]", "", texto)
 
-    # Debug inicial: veja se o arquivo contém STMTTRN
-    print("[DEBUG] Primeiros 300 caracteres:\n", texto[:300])
+    # Debug: imprime todas as linhas que contêm STMTTRN
     for i, linha in enumerate(texto.splitlines()):
         if "STMTTRN" in linha:
             print(f"[DEBUG] Linha {i}: {repr(linha)}")
 
-    # Captura blocos de transação mesmo com espaços no fechamento
-    transacoes = re.findall(r"<STMTTRN>([\s\S]*?)</STMTTRN\s*>", texto, re.IGNORECASE)
+    # Captura blocos tolerando espaços no fechamento
+    transacoes = re.findall(r"<STMTTRN>([\s\S]*?)</STMTTRN.*?>", texto, re.IGNORECASE)
 
     print("[DEBUG] Santander - blocos encontrados:", len(transacoes))
     if transacoes:
@@ -133,7 +133,6 @@ def ler_ofx_santander(caminho_arquivo):
         valor = re.search(r"<TRNAMT>([^<]*)", trn)
         data = re.search(r"<DTPOSTED>([^<]*)", trn)
 
-        # Converte data
         data_valor = None
         if data:
             raw = data.group(1).strip()
@@ -142,7 +141,6 @@ def ler_ofx_santander(caminho_arquivo):
             except Exception:
                 data_valor = None
 
-        # Converte valor (vírgula para ponto)
         valor_num = 0.0
         if valor:
             raw_valor = valor.group(1).strip().replace(",", ".")
@@ -162,7 +160,6 @@ def ler_ofx_santander(caminho_arquivo):
 
     print("[DEBUG] Santander - lançamentos extraídos:", len(lancamentos))
     return lancamentos
-
 
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
@@ -297,6 +294,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
