@@ -102,40 +102,72 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
-blocos = for trn in blocos:
-    memo = re.search(r"<MEMO>([^<]*)", trn)
-    valor = re.search(r"<TRNAMT>([^<]*)", trn)
-    data = re.search(r"<DTPOSTED>([^<]*)", trn)
-    print(memo, valor, data)
-bloco = for trn in blocos:
-    memo = re.search(r"<MEMO>([^<]*)", trn)
-    valor = re.search(r"<TRNAMT>([^<]*)", trn)
-    data = re.search(r"<DTPOSTED>([^<]*)", trn)
-    print(memo, valor, data)
-dentro = False
+import re
+from datetime import datetime
 
-for linha in texto.splitlines():
-    if "<STMTTRN" in linha:
-        dentro = True
-        bloco = []
-    elif "</STMTTRN" in linha:
-        dentro = False
-        blocos.append("\n".join(bloco))
-    elif dentro:
-        bloco.append(linha)
+def ler_ofx_santander(caminho_arquivo):
+    lancamentos = []
 
-print("[DEBUG] blocos encontrados:", len(blocos))
-print("[DEBUG] primeiro bloco:\n", blocos[0])
+    # 🔹 Leia o arquivo com a codificação correta (Windows-1252 / Latin-1)
+    with open(caminho_arquivo, "r", encoding="latin-1") as f:
+        linhas = f.read().replace("\r\n", "\n").replace("\r", "\n").splitlines()
+
+    bloco = []
+    dentro = False
+
+    for linha in linhas:
+        # Início de transação
+        if "<STMTTRN>" in linha:
+            dentro = True
+            bloco = []
+        # Fim de transação (aceita espaços depois da tag)
+        elif "</STMTTRN" in linha:
+            dentro = False
+            trn = "\n".join(bloco)
+
+            # Extrai campos
+            memo = re.search(r"<MEMO>([^<]*)", trn)
+            valor = re.search(r"<TRNAMT>([^<]*)", trn)
+            data = re.search(r"<DTPOSTED>([^<]*)", trn)
+
+            # Converte data
+            data_valor = None
+            if data:
+                raw = data.group(1).strip()
+                try:
+                    data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
+                except Exception:
+                    data_valor = None
+
+            # Converte valor (vírgula para ponto)
+            valor_num = 0.0
+            if valor:
+                raw_valor = valor.group(1).strip().replace(",", ".")
+                try:
+                    valor_num = float(raw_valor)
+                except Exception:
+                    valor_num = 0.0
+
+            lanc = {
+                "historico": memo.group(1).strip() if memo else None,
+                "valor": valor_num,
+                "data": str(data_valor) if data_valor else None,
+                "banco": "SANTANDER",
+                "arquivo_origem": caminho_arquivo,
+            }
+            lancamentos.append(lanc)
+        # Linha dentro do bloco
+        elif dentro:
+            bloco.append(linha)
+
+    print("[DEBUG] Santander - lançamentos extraídos:", len(lancamentos))
+    if lancamentos:
+        print("[DEBUG] Primeiro lançamento:", lancamentos[0])
+    return lancamentos
+    
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
 # ============================================================
-def ler_ofx_universal(texto, arquivo):
-    try:
-        ofx = OfxParser.parse(io.StringIO(texto))
-        return _extrair_lancamentos(ofx, arquivo)
-    except Exception as e:
-        print(f"[DEBUG] Falha no parser universal: {e}")
-        return []
 
 
 # ============================================================
@@ -259,6 +291,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
