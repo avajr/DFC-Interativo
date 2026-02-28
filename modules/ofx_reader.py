@@ -102,54 +102,58 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
+import re
+from datetime import datetime
+
 def ler_ofx_santander(texto, arquivo):
     lancamentos = []
-    linhas = texto.splitlines()
-    bloco = []
-    dentro = False
 
-    for linha in linhas:
-        if "<STMTTRN>" in linha:
-            dentro = True
-            bloco = []
-        elif "</STMTTRN>" in linha:
-            dentro = False
-            trn = "\n".join(bloco)
+    # 🔹 Normaliza quebras de linha e remove caracteres estranhos
+    texto = texto.replace("\r\n", "\n").replace("\r", "\n")
+    texto = re.sub(r"[^\x00-\x7F]+", "", texto)  # remove caracteres fora do ASCII
 
-            memo = re.search(r"<MEMO>([^<]*)", trn)
-            valor = re.search(r"<TRNAMT>([^<]*)", trn)
-            data = re.search(r"<DTPOSTED>([^<]*)", trn)
+    # 🔹 Captura blocos de transação mesmo com indentação
+    transacoes = re.findall(r"<STMTTRN>([\s\S]*?)</STMTTRN\s*>", texto, re.IGNORECASE)
 
-            data_valor = None
-            if data:
-                raw = data.group(1).strip()
-                try:
-                    data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-                except Exception:
-                    data_valor = None
+    print("[DEBUG] Santander - blocos encontrados:", len(transacoes))
+    if transacoes:
+        print("[DEBUG] Primeiro bloco:\n", transacoes[0][:300])
 
-            valor_num = 0.0
-            if valor:
-                raw_valor = valor.group(1).strip().replace(",", ".")
-                try:
-                    valor_num = float(raw_valor)
-                except Exception:
-                    valor_num = 0.0
+    for trn in transacoes:
+        # 🔹 Captura campos ignorando espaços antes da tag
+        memo = re.search(r"\s*<MEMO>([^<]*)", trn)
+        valor = re.search(r"\s*<TRNAMT>([^<]*)", trn)
+        data = re.search(r"\s*<DTPOSTED>([^<]*)", trn)
 
-            lanc = {
-                "historico": memo.group(1).strip() if memo else None,
-                "valor": valor_num,
-                "data": str(data_valor) if data_valor else None,
-                "banco": "SANTANDER",
-                "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
-            }
-            lancamentos.append(lanc)
-        elif dentro:
-            bloco.append(linha)
+        # 🔹 Converte data
+        data_valor = None
+        if data:
+            raw = data.group(1).strip()
+            try:
+                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
+            except Exception:
+                data_valor = None
 
-    print("[DEBUG] Santander - lançamentos encontrados:", len(lancamentos))
+        # 🔹 Converte valor (vírgula para ponto)
+        valor_num = 0.0
+        if valor:
+            raw_valor = valor.group(1).strip().replace(",", ".")
+            try:
+                valor_num = float(raw_valor)
+            except Exception:
+                valor_num = 0.0
+
+        lanc = {
+            "historico": memo.group(1).strip() if memo else None,
+            "valor": valor_num,
+            "data": str(data_valor) if data_valor else None,
+            "banco": "SANTANDER",
+            "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
+        }
+        lancamentos.append(lanc)
+
+    print("[DEBUG] Santander - lançamentos extraídos:", len(lancamentos))
     return lancamentos
-
 
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
@@ -284,6 +288,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
