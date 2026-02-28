@@ -105,27 +105,33 @@ def ler_ofx_sicredi(texto, arquivo):
 import re
 from datetime import datetime
 
-def ler_ofx_santander(texto, arquivo):
+def ler_ofx_santander(caminho_arquivo):
     lancamentos = []
 
-    # 🔹 Normaliza quebras de linha e remove caracteres estranhos
+    # 🔹 Leia o arquivo com a codificação correta
+    with open(caminho_arquivo, "r", encoding="latin-1") as f:
+        texto = f.read()
+
+    # 🔹 Normaliza quebras de linha
     texto = texto.replace("\r\n", "\n").replace("\r", "\n")
-    texto = re.sub(r"[^\x00-\x7F]+", "", texto)  # remove caracteres fora do ASCII
+
+    # 🔹 Debug inicial: veja se o arquivo contém STMTTRN
+    print("[DEBUG] Primeiros 500 caracteres:\n", texto[:500])
+    print("[DEBUG] Ocorrências de STMTTRN:", re.findall(r"STMTTRN", texto))
 
     # 🔹 Captura blocos de transação mesmo com indentação
-    transacoes = re.findall(r"<STMTTRN>([\s\S]*?)</STMTTRN\s*>", texto, re.IGNORECASE)
+    transacoes = re.findall(r"<STMTTRN>([\s\S]*?)</STMTTRN>", texto, re.IGNORECASE)
 
     print("[DEBUG] Santander - blocos encontrados:", len(transacoes))
     if transacoes:
         print("[DEBUG] Primeiro bloco:\n", transacoes[0][:300])
 
     for trn in transacoes:
-        # 🔹 Captura campos ignorando espaços antes da tag
-        memo = re.search(r"\s*<MEMO>([^<]*)", trn)
-        valor = re.search(r"\s*<TRNAMT>([^<]*)", trn)
-        data = re.search(r"\s*<DTPOSTED>([^<]*)", trn)
+        memo = re.search(r"<MEMO>([^<]*)", trn)
+        valor = re.search(r"<TRNAMT>([^<]*)", trn)
+        data = re.search(r"<DTPOSTED>([^<]*)", trn)
 
-        # 🔹 Converte data
+        # Converte data
         data_valor = None
         if data:
             raw = data.group(1).strip()
@@ -134,7 +140,7 @@ def ler_ofx_santander(texto, arquivo):
             except Exception:
                 data_valor = None
 
-        # 🔹 Converte valor (vírgula para ponto)
+        # Converte valor (vírgula para ponto)
         valor_num = 0.0
         if valor:
             raw_valor = valor.group(1).strip().replace(",", ".")
@@ -148,7 +154,7 @@ def ler_ofx_santander(texto, arquivo):
             "valor": valor_num,
             "data": str(data_valor) if data_valor else None,
             "banco": "SANTANDER",
-            "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
+            "arquivo_origem": caminho_arquivo,
         }
         lancamentos.append(lanc)
 
@@ -288,6 +294,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
