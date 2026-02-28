@@ -107,58 +107,57 @@ from datetime import datetime
 
 def ler_ofx_santander(caminho_arquivo):
     lancamentos = []
-
-    # Leia com a codificação correta
     with open(caminho_arquivo, "r", encoding="latin-1") as f:
-        texto = f.read()
+        linhas = f.read().replace("\r\n", "\n").replace("\r", "\n").splitlines()
 
-    # Normaliza e limpa caracteres invisíveis
-    texto = texto.replace("\r\n", "\n").replace("\r", "\n")
-    texto = re.sub(r"[\x00-\x1F]", "", texto)
+    bloco = []
+    dentro = False
 
-    # Debug: imprime todas as linhas que contêm STMTTRN
-    for i, linha in enumerate(texto.splitlines()):
-        if "STMTTRN" in linha:
-            print(f"[DEBUG] Linha {i}: {repr(linha)}")
+    for linha in linhas:
+        if "<STMTTRN>" in linha:
+            dentro = True
+            bloco = []
+        elif "</STMTTRN" in linha:  # aceita fechamento com espaços
+            dentro = False
+            trn = "\n".join(bloco)
 
-    # Captura blocos tolerando espaços no fechamento
-    transacoes = re.findall(r"<STMTTRN>([\s\S]*?)</STMTTRN.*?>", texto, re.IGNORECASE)
+            # Extrai campos
+            memo = re.search(r"<MEMO>([^<]*)", trn)
+            valor = re.search(r"<TRNAMT>([^<]*)", trn)
+            data = re.search(r"<DTPOSTED>([^<]*)", trn)
 
-    print("[DEBUG] Santander - blocos encontrados:", len(transacoes))
-    if transacoes:
-        print("[DEBUG] Primeiro bloco:\n", transacoes[0][:300])
+            # Converte data
+            data_valor = None
+            if data:
+                raw = data.group(1).strip()
+                try:
+                    data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
+                except Exception:
+                    data_valor = None
 
-    for trn in transacoes:
-        memo = re.search(r"<MEMO>([^<]*)", trn)
-        valor = re.search(r"<TRNAMT>([^<]*)", trn)
-        data = re.search(r"<DTPOSTED>([^<]*)", trn)
+            # Converte valor
+            valor_num = 0.0
+            if valor:
+                raw_valor = valor.group(1).strip().replace(",", ".")
+                try:
+                    valor_num = float(raw_valor)
+                except Exception:
+                    valor_num = 0.0
 
-        data_valor = None
-        if data:
-            raw = data.group(1).strip()
-            try:
-                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-            except Exception:
-                data_valor = None
-
-        valor_num = 0.0
-        if valor:
-            raw_valor = valor.group(1).strip().replace(",", ".")
-            try:
-                valor_num = float(raw_valor)
-            except Exception:
-                valor_num = 0.0
-
-        lanc = {
-            "historico": memo.group(1).strip() if memo else None,
-            "valor": valor_num,
-            "data": str(data_valor) if data_valor else None,
-            "banco": "SANTANDER",
-            "arquivo_origem": caminho_arquivo,
-        }
-        lancamentos.append(lanc)
+            lanc = {
+                "historico": memo.group(1).strip() if memo else None,
+                "valor": valor_num,
+                "data": str(data_valor) if data_valor else None,
+                "banco": "SANTANDER",
+                "arquivo_origem": caminho_arquivo,
+            }
+            lancamentos.append(lanc)
+        elif dentro:
+            bloco.append(linha)
 
     print("[DEBUG] Santander - lançamentos extraídos:", len(lancamentos))
+    if lancamentos:
+        print("[DEBUG] Primeiro lançamento:", lancamentos[0])
     return lancamentos
 
 # ============================================================
@@ -294,6 +293,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
