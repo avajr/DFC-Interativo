@@ -102,58 +102,31 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
-import re
-from datetime import datetime
-
-def ler_ofx_santander(arquivo):
-
-    # Se for Streamlit UploadedFile
-    if hasattr(arquivo, "read"):
-        arquivo.seek(0)
-        conteudo = arquivo.read().decode("cp1252", errors="ignore")
-    else:
-        with open(arquivo, "r", encoding="cp1252", errors="ignore") as f:
-            conteudo = f.read()
-
+def ler_ofx_santander(texto, arquivo):
     lancamentos = []
+    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL)
 
-    # 🔥 Divide por <STMTTRN> ao invés de depender do fechamento
-    blocos = conteudo.split("<STMTTRN>")
+    for trn in transacoes:
+        memo = re.search(r"<MEMO>(.*?)\n", trn)
+        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
+        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
 
-    for bloco in blocos[1:]:  # ignora o primeiro pedaço antes do primeiro STMTTRN
-
-        memo = re.search(r"<MEMO>(.*)", bloco)
-        valor = re.search(r"<TRNAMT>(.*)", bloco)
-        data = re.search(r"<DTPOSTED>(.*)", bloco)
-
-        # Data
         data_valor = None
         if data:
             raw = data.group(1).strip()
             try:
                 data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-            except:
+            except Exception:
                 data_valor = None
 
-        # Valor
-        valor_num = 0.0
-        if valor:
-            raw_valor = valor.group(1).strip().replace(",", ".")
-            try:
-                valor_num = float(raw_valor)
-            except:
-                valor_num = 0.0
-
-        lancamentos.append({
+        lanc = {
             "historico": memo.group(1).strip() if memo else None,
-            "valor": valor_num,
+            "valor": float(valor.group(1)) if valor else 0.0,
             "data": str(data_valor) if data_valor else None,
             "banco": "SANTANDER",
             "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
-        })
-
-    print("DEBUG - blocos encontrados:", len(blocos) - 1)
-    print("DEBUG - lançamentos extraídos:", len(lancamentos))
+        }
+        lancamentos.append(lanc)
 
     return lancamentos
 # ============================================================
@@ -289,6 +262,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
