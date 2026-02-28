@@ -107,16 +107,14 @@ from datetime import datetime
 
 def ler_ofx_santander(texto, arquivo):
     lancamentos = []
-    # Captura blocos de transação
+    # Santander entrega SGML: blocos terminam em </STMTTRN> mas tags internas não têm fechamento
     transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL | re.IGNORECASE)
 
     for trn in transacoes:
-        # Santander usa SGML: tags sem fechamento, terminam na quebra de linha
-        memo = re.search(r"<MEMO>([^\r\n]*)", trn)
-        valor = re.search(r"<TRNAMT>([^\r\n]*)", trn)
-        data = re.search(r"<DTPOSTED>([^\r\n]*)", trn)
+        memo = re.search(r"<MEMO>(.*?)\n", trn)
+        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
+        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
 
-        # Converte data
         data_valor = None
         if data:
             raw = data.group(1).strip()
@@ -125,7 +123,6 @@ def ler_ofx_santander(texto, arquivo):
             except Exception:
                 data_valor = None
 
-        # Converte valor
         valor_num = 0.0
         if valor:
             raw_valor = valor.group(1).strip().replace(",", ".")
@@ -271,6 +268,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
