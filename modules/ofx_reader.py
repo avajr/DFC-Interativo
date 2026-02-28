@@ -102,6 +102,9 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
+import io
+from ofxparse import OfxParser
+
 def ler_ofx_santander(texto, arquivo):
     # Usa OfxParser para interpretar o texto
     ofx = OfxParser.parse(io.StringIO(texto))
@@ -245,6 +248,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
