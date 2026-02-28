@@ -102,18 +102,14 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
-import re
-from datetime import datetime
-
 def ler_ofx_santander(texto, arquivo):
     lancamentos = []
-    # Santander entrega SGML: blocos terminam em </STMTTRN> mas tags internas não têm fechamento
-    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL | re.IGNORECASE)
+    transacoes = re.findall(r"<STMTTRN>(.*?)(?=<STMTTRN>|</BANKTRANLIST>)", texto, re.DOTALL | re.IGNORECASE)
 
     for trn in transacoes:
-        memo = re.search(r"<MEMO>(.*?)\n", trn)
-        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
-        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
+        memo = re.search(r"<MEMO>([^\r\n]*)", trn)
+        valor = re.search(r"<TRNAMT>([^\r\n]*)", trn)
+        data = re.search(r"<DTPOSTED>([^\r\n]*)", trn)
 
         data_valor = None
         if data:
@@ -268,6 +264,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
