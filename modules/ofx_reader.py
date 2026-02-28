@@ -108,19 +108,21 @@ from datetime import datetime
 def ler_ofx_santander(caminho_arquivo):
     lancamentos = []
 
-    # 🔹 Leia o arquivo com a codificação correta
+    # Leia com a codificação correta
     with open(caminho_arquivo, "r", encoding="latin-1") as f:
         texto = f.read()
 
-    # 🔹 Normaliza quebras de linha
+    # Normaliza quebras de linha
     texto = texto.replace("\r\n", "\n").replace("\r", "\n")
 
-    # 🔹 Debug inicial: veja se o arquivo contém STMTTRN
-    print("[DEBUG] Primeiros 500 caracteres:\n", texto[:500])
-    print("[DEBUG] Ocorrências de STMTTRN:", re.findall(r"STMTTRN", texto))
+    # Debug inicial: veja se o arquivo contém STMTTRN
+    print("[DEBUG] Primeiros 300 caracteres:\n", texto[:300])
+    for i, linha in enumerate(texto.splitlines()):
+        if "STMTTRN" in linha:
+            print(f"[DEBUG] Linha {i}: {repr(linha)}")
 
-    # 🔹 Captura blocos de transação mesmo com indentação
-    transacoes = re.findall(r"<STMTTRN>([\s\S]*?)</STMTTRN>", texto, re.IGNORECASE)
+    # Captura blocos de transação mesmo com espaços no fechamento
+    transacoes = re.findall(r"<STMTTRN>([\s\S]*?)</STMTTRN\s*>", texto, re.IGNORECASE)
 
     print("[DEBUG] Santander - blocos encontrados:", len(transacoes))
     if transacoes:
@@ -160,6 +162,7 @@ def ler_ofx_santander(caminho_arquivo):
 
     print("[DEBUG] Santander - lançamentos extraídos:", len(lancamentos))
     return lancamentos
+
 
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
@@ -294,6 +297,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
