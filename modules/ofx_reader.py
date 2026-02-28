@@ -103,12 +103,9 @@ def ler_ofx_sicredi(texto, arquivo):
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
 def ler_ofx_santander(texto, arquivo):
-    print("[DEBUG] Primeiros 500 caracteres do arquivo:\n", texto[:500])
+    print("[DEBUG] Primeiros 500 caracteres:\n", texto[:500])
     print("[DEBUG] Ocorrências de STMTTRN:", texto.count("STMTTRN"))
     return []
-def ler_ofx_santander(texto, arquivo):
-    lancamentos = []
-    transacoes = re.findall(r"<STMTTRN>(.*?)(?=<STMTTRN>|</BANKTRANLIST>)", texto, re.DOTALL | re.IGNORECASE)
 
     for trn in transacoes:
         memo = re.search(r"<MEMO>([^\r\n]*)", trn)
@@ -268,6 +265,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
