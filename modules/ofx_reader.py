@@ -102,33 +102,22 @@ def ler_ofx_sicredi(texto, arquivo):
 # ============================================================
 # 🔹 Parser manual para Santander (OFX SGML)
 # ============================================================
-def ler_ofx_santander(texto, arquivo):
-    lancamentos = []
-    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL)
+blocos = []
+bloco = []
+dentro = False
 
-    for trn in transacoes:
-        memo = re.search(r"<MEMO>(.*?)\n", trn)
-        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
-        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
+for linha in texto.splitlines():
+    if "<STMTTRN" in linha:
+        dentro = True
+        bloco = []
+    elif "</STMTTRN" in linha:
+        dentro = False
+        blocos.append("\n".join(bloco))
+    elif dentro:
+        bloco.append(linha)
 
-        data_valor = None
-        if data:
-            raw = data.group(1).strip()
-            try:
-                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-            except Exception:
-                data_valor = None
-
-        lanc = {
-            "historico": memo.group(1).strip() if memo else None,
-            "valor": float(valor.group(1)) if valor else 0.0,
-            "data": str(data_valor) if data_valor else None,
-            "banco": "SANTANDER",
-            "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
-        }
-        lancamentos.append(lanc)
-
-    return lancamentos
+print("[DEBUG] blocos encontrados:", len(blocos))
+print("[DEBUG] primeiro bloco:\n", blocos[0])
 # ============================================================
 # 🔹 Parser universal (usa OfxParser)
 # ============================================================
@@ -262,6 +251,7 @@ def importar_ofx(arquivo):
 
     print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
+
 
 
 
