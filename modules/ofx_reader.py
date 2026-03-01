@@ -1,216 +1,98 @@
-import io
 import re
-from ofxparse import OfxParser
-from modules.database import executar_query
 from datetime import datetime
-
-# ============================================================
-# 🔹 Parser manual para Itaú (OFX SGML)
-# ============================================================
-def ler_ofx_itau(texto, arquivo):
-    lancamentos = []
-    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL)
-
-    for trn in transacoes:
-        memo = re.search(r"<MEMO>(.*?)\n", trn)
-        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
-        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
-
-        data_valor = None
-        if data:
-            raw = data.group(1).strip()
-            try:
-                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-            except Exception:
-                data_valor = None
-
-        lanc = {
-            "historico": memo.group(1).strip() if memo else None,
-            "valor": float(valor.group(1)) if valor else 0.0,
-            "data": str(data_valor) if data_valor else None,
-            "banco": "ITAÚ",
-            "arquivo_origem": getattr(arquivo, "name", "OFX_ITAU"),
-        }
-        lancamentos.append(lanc)
-
-    return lancamentos
+from modules.database import executar_query
 
 
-# ============================================================
-# 🔹 Parser manual para Banco do Brasil (OFX SGML)
-# ============================================================
-def ler_ofx_bb(texto, arquivo):
-    lancamentos = []
-    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL)
+class OFXParser:
 
-    for trn in transacoes:
-        memo = re.search(r"<MEMO>(.*?)\n", trn)
-        valor = re.search(r"<TRNAMT>(.*?)\n", trn)
-        data = re.search(r"<DTPOSTED>(.*?)\n", trn)
+    def __init__(self, texto):
+        self.texto = texto.replace("\r", "").replace("\n", "")
+        self.banco = self.detectar_banco()
 
-        data_valor = None
-        if data:
-            raw = data.group(1).strip()
-            try:
-                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-            except Exception:
-                data_valor = None
+    def detectar_banco(self):
+        t = self.texto.upper()
+        if "SANTANDER" in t:
+            return "SANTANDER"
+        if "ITAU" in t or "341" in t:
+            return "ITAÚ"
+        if "BANCO DO BRASIL" in t or "<BANKID>001" in t:
+            return "BANCO DO BRASIL"
+        if "SICREDI" in t or "<BANKID>748" in t:
+            return "SICREDI"
+        return "DESCONHECIDO"
 
-        lanc = {
-            "historico": memo.group(1).strip() if memo else None,
-            "valor": float(valor.group(1)) if valor else 0.0,
-            "data": str(data_valor) if data_valor else None,
-            "banco": "BANCO DO BRASIL",
-            "arquivo_origem": getattr(arquivo, "name", "OFX_BB"),
-        }
-        lancamentos.append(lanc)
+    def extrair(self, tag):
+        padrao = f"<{tag}>([^<]+)"
+        return re.findall(padrao, self.texto)
 
-    return lancamentos
+    def parse(self):
+        transacoes = []
 
+        datas = self.extrair("DTPOSTED")
+        valores = self.extrair("TRNAMT")
+        memos = self.extrair("MEMO")
 
-# ============================================================
-# 🔹 Parser manual para Sicredi (OFX SGML)
-# ============================================================
-def ler_ofx_sicredi(texto, arquivo):
-    lancamentos = []
-    transacoes = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, re.DOTALL | re.IGNORECASE)
+        for i in range(len(valores)):
 
-    for trn in transacoes:
-        memo = re.search(r"<MEMO>(.*?)</MEMO>", trn, re.DOTALL)
-        valor = re.search(r"<TRNAMT>(.*?)</TRNAMT>", trn, re.DOTALL)
-        data = re.search(r"<DTPOSTED>(.*?)</DTPOSTED>", trn, re.DOTALL)
+            data = self.converter_data(datas[i]) if i < len(datas) else None
+            valor = self.converter_valor(valores[i])
+            memo = memos[i] if i < len(memos) else ""
 
-        data_valor = None
-        if data:
-            raw = data.group(1).strip()
-            try:
-                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-            except Exception:
-                data_valor = None
+            transacoes.append({
+                "banco": self.banco,
+                "data": str(data.date()) if data else None,
+                "valor": valor,
+                "historico": memo.strip(),
+            })
 
-        lanc = {
-            "historico": memo.group(1).strip() if memo else None,
-            "valor": float(valor.group(1)) if valor else 0.0,
-            "data": str(data_valor) if data_valor else None,
-            "banco": "SICREDI",
-            "arquivo_origem": getattr(arquivo, "name", "OFX_SICREDI"),
-        }
-        lancamentos.append(lanc)
+        return transacoes
 
-    return lancamentos
+    def converter_data(self, d):
+        d = d.split("[")[0].strip()
+        if len(d) >= 14:
+            return datetime.strptime(d[:14], "%Y%m%d%H%M%S")
+        if len(d) == 8:
+            return datetime.strptime(d, "%Y%m%d")
+        return None
 
-# ============================================================
-# 🔹 Parser manual para Santander (OFX SGML)
-# ============================================================
-def ler_ofx_santander(texto, arquivo):
-    print("[DEBUG] Primeiros 500 caracteres:\n", texto[:500])
-    print("[DEBUG] Ocorrências de STMTTRN:", texto.count("STMTTRN"))
-    return []
-
-    for trn in transacoes:
-        memo = re.search(r"<MEMO>([^\r\n]*)", trn)
-        valor = re.search(r"<TRNAMT>([^\r\n]*)", trn)
-        data = re.search(r"<DTPOSTED>([^\r\n]*)", trn)
-
-        data_valor = None
-        if data:
-            raw = data.group(1).strip()
-            try:
-                data_valor = datetime.strptime(raw[:8], "%Y%m%d").date()
-            except Exception:
-                data_valor = None
-
-        valor_num = 0.0
-        if valor:
-            raw_valor = valor.group(1).strip().replace(",", ".")
-            try:
-                valor_num = float(raw_valor)
-            except Exception:
-                valor_num = 0.0
-
-        lanc = {
-            "historico": memo.group(1).strip() if memo else None,
-            "valor": valor_num,
-            "data": str(data_valor) if data_valor else None,
-            "banco": "SANTANDER",
-            "arquivo_origem": getattr(arquivo, "name", "OFX_SANTANDER"),
-        }
-        lancamentos.append(lanc)
-
-    return lancamentos
-    
-# ============================================================
-# 🔹 Parser universal (usa OfxParser)
-# ============================================================
+    def converter_valor(self, v):
+        v = v.replace(",", ".")
+        try:
+            return float(v)
+        except:
+            return 0.0
 
 
-# ============================================================
-# 🔹 Extração dos lançamentos do OFX (genérico)
-# ============================================================
-def _extrair_lancamentos(ofx, arquivo):
-    lancamentos = []
-    transacoes = getattr(ofx, "transactions", None) or getattr(ofx.account, "transactions", None)
-
-    if not transacoes:
-        print("[DEBUG] Nenhuma lista de transações encontrada.")
-        return []
-
-    for t in transacoes:
-        lanc = {
-            "data": str(t.date.date()) if hasattr(t.date, "date") else str(t.date),
-            "valor": float(t.amount),
-            "historico": t.memo,
-            "banco": getattr(ofx.account.institution, "organization", "BANCO_DESCONHECIDO"),
-            "arquivo_origem": getattr(arquivo, "name", "OFX_DESCONHECIDO"),
-        }
-        lancamentos.append(lanc)
-
-    return lancamentos
-
-
-# ============================================================
-# 🔹 Leitura do arquivo OFX (roteador de parsers)
-# ============================================================
 def ler_ofx(arquivo):
     arquivo.seek(0)
     content = arquivo.read()
+
     if not content:
-        print("[DEBUG] Arquivo vazio ao tentar ler.")
+        print("[DEBUG] Arquivo vazio.")
         return []
 
-    encodings = ["utf-8", "latin-1", "cp1252"]
-
-    for enc in encodings:
+    for enc in ["utf-8", "latin-1", "cp1252"]:
         try:
             text = content.decode(enc)
 
-            if "OFXHEADER" in text and "DATA:OFXSGML" in text:
-                if "ITAÚ" in text or "ITAU" in text:
-                    return ler_ofx_itau(text, arquivo)
-                elif "BANCO DO BRASIL" in text or "BB" in text:
-                    return ler_ofx_bb(text, arquivo)
-                elif "SICREDI" in text or "COOP DE CRED" in text:
-                    return ler_ofx_sicredi(text, arquivo)
-                elif "SANTANDER" in text:
-                    return ler_ofx_santander(text, arquivo)
-                else:
-                    print("[DEBUG] SGML não identificado, usando parser universal.")
-                    return ler_ofx_universal(text, arquivo)
+            parser = OFXParser(text)
+            lancamentos = parser.parse()
 
-            # Se não for SGML, usa universal direto
-            return ler_ofx_universal(text, arquivo)
+            for l in lancamentos:
+                l["arquivo_origem"] = getattr(arquivo, "name", "OFX")
+
+            print(f"[DEBUG] Banco detectado: {parser.banco}")
+            print(f"[DEBUG] Lançamentos encontrados: {len(lancamentos)}")
+
+            return lancamentos
 
         except Exception as e:
-            print(f"[DEBUG] Falha ao parsear com encoding {enc}: {e}")
+            print(f"[DEBUG] Falha encoding {enc}: {e}")
             continue
 
-    print("[DEBUG] Não foi possível decodificar o arquivo.")
     return []
 
 
-# ============================================================
-# 🔹 Verificação de duplicidade (data + valor + historico)
-# ============================================================
 def existe_lancamento(lanc):
     query = """
         SELECT COUNT(*) FROM lancamentos
@@ -218,15 +100,12 @@ def existe_lancamento(lanc):
     """
     resultado = executar_query(
         query,
-        (lanc["data"], float(lanc["valor"]) if lanc["valor"] is not None else None, lanc["historico"]),
+        (lanc["data"], lanc["valor"], lanc["historico"]),
         fetch=True
     )
     return resultado and resultado[0][0] > 0
 
 
-# ============================================================
-# 🔹 Inserção de lançamento
-# ============================================================
 def salvar_lancamento(lanc):
     query = """
         INSERT INTO lancamentos (data, valor, historico, banco, arquivo_origem)
@@ -234,23 +113,19 @@ def salvar_lancamento(lanc):
         ON CONFLICT (data, valor, historico) DO NOTHING
     """
     executar_query(query, (
-        str(lanc["data"]),
-        float(lanc["valor"]) if lanc["valor"] is not None else None,
+        lanc["data"],
+        lanc["valor"],
         lanc["historico"],
         lanc["banco"],
         lanc["arquivo_origem"]
     ))
 
 
-# ============================================================
-# 🔹 Importação do arquivo OFX
-# ============================================================
 def importar_ofx(arquivo):
-    arquivo.seek(0)
     lancamentos = ler_ofx(arquivo)
 
     if not lancamentos:
-        print("[DEBUG] Nenhum lançamento encontrado no arquivo.")
+        print("[DEBUG] Nenhum lançamento encontrado.")
         return 0, 0
 
     inseridos = 0
@@ -263,43 +138,4 @@ def importar_ofx(arquivo):
         else:
             ignorados += 1
 
-    print(f"Arquivo {getattr(arquivo, 'name', 'OFX')} importado: {inseridos} novos, {ignorados} ignorados.")
     return inseridos, ignorados
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
